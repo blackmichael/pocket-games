@@ -28,6 +28,27 @@ The build directory contains the complete static site. Deploy it to Cloudflare P
 
 Dependency audit note (2026-11-08): the build toolchain includes deepmerge 4.3.1, affected by the low-severity [GHSA-gcqx-w48m-w2h4](https://github.com/advisories/GHSA-gcqx-w48m-w2h4). No patched release is available. Its current use merges trusted Svelte/Vite configuration, not player input, and it is not part of the static browser application. Recheck when updating dependencies; do not apply the audit's suggested downgrade to obsolete SvelteKit versions.
 
+## Container deployment
+
+The production hostname is https://games.michaelblack.xyz. Dockerfile builds with Node, runs the checks/tests, and copies only the generated static site into non-root Nginx listening on port 8080. No Node process, backend, or puzzle generation runs in the production container. Base images are digest-pinned; the build stage uses the builder's native architecture because its static output is architecture-independent.
+
+```sh
+docker build -t pocket-games .
+docker run --rm -p 8080:8080 pocket-games
+```
+
+nginx.conf serves prerendered directory routes without an SPA fallback: unknown paths and missing assets return 404. HTML is revalidated, hashed assets have immutable caching, and text assets are gzip-compressed.
+
+.github/workflows/push-and-deploy.yaml follows the existing Spareme deployment flow. A push to main (or a manual run on main) builds and publishes linux/amd64 and linux/arm64 images to ghcr.io/blackmichael/pocket-games with latest, main, and sha-<full-commit> tags, then sends deploy-homepi to blackmichael/homepi. Actions are commit-pinned. The workflow uses GITHUB_TOKEN for GHCR and requires the HOMEPI_DISPATCH_TOKEN Actions secret with repository-dispatch access to homepi (Contents: write for a fine-grained token).
+
+Before the first deployment, configure the receiving infrastructure in blackmichael/homepi:
+
+- Add a pocket-games-web service using ghcr.io/blackmichael/pocket-games:latest on its existing proxy_external network. Route Host(`games.michaelblack.xyz`) to container port 8080, not the Spareme container's port 80.
+- Add pocket-games-web|blackmichael/pocket-games to .github/deploy-targets.txt; the receiver rejects unregistered source repositories.
+- Configure DNS/TLS for games.michaelblack.xyz in the existing proxy setup, and allow the deployment host to pull the GHCR package (public visibility or authenticated pulls).
+
+Those infrastructure changes are separate from this repository. No VITE_SITE_URL build argument is needed: puzzle links use the browser's actual origin, and TLS terminates at the existing proxy.
+
 ## Puzzle behavior
 
 - Today's puzzle uses the browser clock and the America/Chicago calendar date, including daylight saving time.

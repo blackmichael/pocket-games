@@ -27,6 +27,7 @@
 - src/routes/games/fivefold/+page.svelte: reference lazy route, puzzle picker, rollover lifecycle.
 - src/app.css: global tokens, focus, reduced motion, shared button/notice styles.
 - vite.config.ts: SvelteKit 3 configuration and static prerender entries. There is no svelte.config.js.
+- Dockerfile builds/checks/tests the static site; nginx.conf serves it as non-root on port 8080 with real prerendered routes, immutable hashed assets, and no SPA fallback. .github/workflows/push-and-deploy.yaml publishes multi-architecture images and dispatches homepi deployment; infrastructure/hostname routing prerequisites are in README.
 - package.json defines native #lib/* subpath imports. Use #lib/platform/daily.js for TypeScript modules; do not reintroduce the legacy $lib alias or .svelte-kit/tsconfig.json.
 - static/word-list-license.txt publishes the vocabulary notice. Keep it in sync with src/lib/games/fivefold/DICTIONARY-LICENSE.txt when changing provenance.
 
