@@ -1,0 +1,72 @@
+Fivefold version-1 vocabulary and generator provenance
+====================================================
+
+Accepted guesses are derived from the English five-letter word list published
+by Tab Atkins Jr. at https://github.com/tabatkins/wordle-list.
+Frozen source revision: 255b9469c4dad99a3b95cc4ddbe139b3d3747868
+Source file:
+https://raw.githubusercontent.com/tabatkins/wordle-list/255b9469c4dad99a3b95cc4ddbe139b3d3747868/words
+License source: https://github.com/tabatkins/wordle-list/blob/255b9469c4dad99a3b95cc4ddbe139b3d3747868/LICENSE
+Retrieved: 2026-11-07.
+
+Local transformation: retain exactly five lowercase ASCII letters, uppercase
+ASCII, deduplicate, and sort by ASCII code-unit order. This yields 14,855
+accepted guesses. words.ts freezes the complete result; there are no runtime
+network requests. The 1,211 answers are a manually curated subset of familiar
+words, deduplicated and sorted in ASCII order. Answers favor familiar singular
+nouns, verbs, and adjectives rather than obscure dictionary entries; accepted
+guesses deliberately retain the source's broader vocabulary and inflections.
+
+Generator version 1 (engine.ts)
+-------------------------------
+Inputs are exact JavaScript strings. No trimming, case folding, Unicode
+normalization, locale operations, date lookups, or platform entropy is used.
+Encode each UTF-16 code unit in low-byte, high-byte order (UTF-16LE with no BOM).
+This specifies empty strings, astral characters, and lone surrogates exactly.
+
+Start h = 2166136261 (FNV-1a's 32-bit offset basis). For every encoded byte b:
+  h = ((h XOR b) * 16777619) modulo 2^32.
+The multiplication uses Math.imul, not floating-point multiplication.
+Then apply one xorshift32 step, in order:
+  h = h XOR (h << 13)
+  h = h XOR (h >>> 17)
+  h = h XOR (h << 5)
+Treat the result as an unsigned 32-bit integer. Select ANSWERS[h % 1211].
+Left shifts and XOR have JavaScript's 32-bit bitwise semantics; >>> is a
+zero-filling right shift. There is no persistent PRNG state. Seed hashing is
+linear in the seed's UTF-16 length, followed by constant-time answer selection;
+there is no scan or rejection loop over possible answers. This is a puzzle
+selector, not a cryptographic random generator. Modulo reduction has the usual
+negligible bias when 1211 does not divide 2^32.
+
+The ordered answer array is part of the version-1 format. Changing its order,
+contents, the seed encoding, or the selector requires a new generator version
+and an explicit migration of the puzzle identity contract. Saved games use
+{version: 1, guesses: string[], draft: string}; all letters are uppercase ASCII.
+Duplicate guesses are permitted; guesses after a correct answer are not.
+A completed six-guess or won game has an empty draft.
+
+Redistribution license for the upstream vocabulary
+--------------------------------------------------
+
+MIT License
+
+Copyright (c) 2022 Tab Atkins Jr.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

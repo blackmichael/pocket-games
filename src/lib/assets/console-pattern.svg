@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="320" viewBox="0 0 360 320" fill="none" stroke="#777" stroke-opacity=".28" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+  <defs>
+    <g id="controller">
+      <path d="M23 12h38c7 0 12 4 15 12l8 24c2 7-4 12-10 8L60 43H24L10 56C4 60-2 55 0 48l8-24c3-8 8-12 15-12Z"/>
+      <path d="M17 28h14m-7-7v14m13-2h5m5 0h5"/>
+      <circle cx="63" cy="25" r="3"/>
+      <circle cx="71" cy="33" r="3"/>
+    </g>
+  </defs>
+  <use href="#controller" transform="translate(35 24) rotate(-14 42 33)"/>
+  <g transform="translate(223 38) rotate(12 22 36)">
+    <rect width="44" height="72" rx="7"/>
+    <rect x="6" y="8" width="32" height="24" rx="2"/>
+    <path d="M9 47h12m-6-6v12m-1 10h4m4 0h4m4 0h4"/>
+    <circle cx="31" cy="44" r="2.5"/>
+    <circle cx="36" cy="50" r="2.5"/>
+  </g>
+  <g transform="translate(76 170) rotate(-9 40 21)">
+    <rect width="80" height="42" rx="6"/>
+    <path d="M0 13h80M13 25h34M51 6v2m5-2v2m5-2v2"/>
+    <circle cx="65" cy="26" r="3.5"/>
+    <path d="M13 34h5"/>
+  </g>
+  <use href="#controller" transform="translate(244 233) rotate(11 42 33)"/>
+</svg>
