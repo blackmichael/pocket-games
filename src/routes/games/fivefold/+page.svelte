@@ -2,9 +2,9 @@
   import { onMount } from 'svelte';
   import type { Component } from 'svelte';
   import { page } from '$app/state';
-  import { goto } from '$app/navigation';
-  import { chicagoDate, displayDate, resolvePuzzle } from '#lib/platform/daily.js';
+  import { chicagoDate, dailyIdentity, displayDate, resolvePuzzle } from '#lib/platform/daily.js';
   import { puzzleKey, puzzleUrl, type PuzzleIdentity } from '#lib/platform/types.js';
+  import PuzzlePicker from '#lib/platform/PuzzlePicker.svelte';
 
   let Game = $state<Component<{ identity: PuzzleIdentity }> | null>(null);
   let identity = $state<PuzzleIdentity | null>(null);
@@ -12,8 +12,6 @@
   let error = $state<string | null>(null);
   let loadError = $state(false);
   let today = $state('');
-  let selectedDate = $state('');
-  let customSeed = $state('');
   let newDay = $state(false);
 
   $effect(() => {
@@ -24,8 +22,6 @@
     error = resolved.error;
     newDay = false;
     if (resolved.identity) {
-      selectedDate = resolved.identity.date ?? chicagoDate();
-      customSeed = resolved.identity.mode === 'seed' ? resolved.identity.seed : '';
       try { localStorage.setItem('puzzle-room:last-played', puzzleUrl(resolved.identity, location.origin)); } catch { /* Game surface reports save availability. */ }
     }
   });
@@ -33,7 +29,6 @@
   onMount(() => {
     let alive = true;
     today = chicagoDate();
-    selectedDate = today;
     ready = true;
     import('#lib/games/fivefold/Fivefold.svelte')
       .then((module) => { if (alive) Game = module.default; })
@@ -52,19 +47,6 @@
     };
   });
 
-  function openDate(event: SubmitEvent) {
-    event.preventDefault();
-    if (selectedDate) void goto('/games/fivefold/?' + new URLSearchParams({ date: selectedDate, v: '1' }));
-  }
-  function openSeed(event: SubmitEvent) {
-    event.preventDefault();
-    void goto('/games/fivefold/?' + new URLSearchParams({ seed: customSeed, v: '1' }));
-  }
-  function randomPuzzle() {
-    const values = crypto.getRandomValues(new Uint32Array(2));
-    const seed = [...values].map((n) => n.toString(16).padStart(8, '0')).join('');
-    void goto('/games/fivefold/?' + new URLSearchParams({ seed, v: '1' }));
-  }
 </script>
 
 <svelte:head>
@@ -78,7 +60,7 @@
       <h1>Fivefold</h1>
       <p>Five letters, six guesses.</p>
     </div>
-    <a href={today ? '/games/fivefold/?date=' + today + '&v=1' : '/games/fivefold/'}>Today’s puzzle</a>
+    <PuzzlePicker gameId="fivefold" {identity} />
   </header>
 
   <section class="play-surface" aria-label="Fivefold game">
@@ -94,7 +76,7 @@
     {#if newDay}
       <div class="notice rollover" role="status">
         A new daily is available. Your current board stays here.
-        <a href="/games/fivefold/?date={today}&v=1">Play the new daily</a>
+        <a href={puzzleUrl(dailyIdentity('fivefold', today), location.origin)}>Play the new daily</a>
       </div>
     {/if}
     {#if error}
@@ -112,28 +94,6 @@
     <noscript><p class="notice">Find the five-letter word in six guesses. Clues show letters in the right spot, the wrong spot, or with no match. Enable JavaScript to generate and play the puzzle.</p></noscript>
   </section>
 
-  <details class="puzzle-picker">
-    <summary>Pick another puzzle</summary>
-    <div class="picker-fields">
-      <form onsubmit={openDate}>
-        <label for="puzzle-date">Daily date</label>
-        <div class="field-row">
-          <input id="puzzle-date" type="date" bind:value={selectedDate} required />
-          <button class="button" type="submit">Go</button>
-        </div>
-      </form>
-      <form onsubmit={openSeed}>
-        <label for="puzzle-seed">Custom seed</label>
-        <div class="field-row">
-          <input id="puzzle-seed" type="text" bind:value={customSeed} autocomplete="off" />
-          <button class="button" type="submit">Go</button>
-        </div>
-      </form>
-    </div>
-    <p class="field-help">The same seed gives the same puzzle in version 1.</p>
-    <button class="text-link random" onclick={randomPuzzle}>Random puzzle</button>
-    <p class="field-help">Daily puzzles change at midnight in Chicago. Progress is saved in this browser; clearing browser data removes it.</p>
-  </details>
 </main>
 
 <style>
@@ -141,25 +101,14 @@
   .game-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
   h1 { font-size: 1.85rem; font-weight: 750; letter-spacing: -.5px; margin: 0 0 8px; }
   .game-heading p { color: var(--muted); margin: 0; font-size: .85rem; }
-  .game-heading > a { display: inline-flex; align-items: center; min-height: 44px; font-size: .8rem; white-space: nowrap; }
   .puzzle-meta { display: flex; justify-content: space-between; gap: 16px; font-size: .8rem; color: var(--muted); margin-bottom: 20px; }
   .seed-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .loading { text-align: center; color: var(--muted); padding: 80px 0; }
   .rollover { margin-bottom: 16px; font-size: .85rem; }
-  .puzzle-picker { border-top: 1px solid var(--line); }
-  summary { cursor: pointer; font-size: .85rem; padding: 16px 0; }
-  .picker-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-  label { display: block; font-size: .8rem; margin-bottom: 8px; }
-  input { min-width: 0; width: 100%; min-height: 44px; padding: 8px 10px; border: 1px solid var(--accent-line); border-radius: 6px; background: var(--paper); color: var(--ink); font-size: 1rem; }
-  .field-row { display: flex; gap: 8px; }
-  .field-row input { flex: 1; }
-  .field-help { font-size: .75rem; line-height: 1.6; color: var(--muted); margin: 12px 0 16px; }
-  .random { min-height: 44px; font-size: .85rem; }
   @media (max-width: 500px) {
     main { width: calc(100% - 24px); margin-top: 22px; padding: 18px 10px 8px; border-radius: 10px; box-shadow: none; }
     .game-heading { margin-bottom: 20px; }
     .puzzle-meta { font-size: .72rem; }
-    .picker-fields { grid-template-columns: 1fr; gap: 16px; }
   }
   @media (max-width: 500px) and (max-height: 740px) {
     main { margin-top: 14px; padding-top: 12px; }

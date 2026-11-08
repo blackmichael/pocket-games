@@ -1,7 +1,7 @@
 <script lang="ts">
   import { games } from '#lib/catalog.js';
   import { onMount } from 'svelte';
-  import { chicagoDate, displayDate } from '#lib/platform/daily.js';
+  import { chicagoDate, displayDate, resolvePuzzle } from '#lib/platform/daily.js';
   const gameCardColors = ['#AD8BEB', '#F5C542', '#59CDA4', '#F58676', '#6ACAE8', '#EE91C2'] as const;
   let today = $state('');
   let lastPlayed = $state<string | null>(null);
@@ -12,7 +12,12 @@
     window.addEventListener('focus', updateDate);
     try {
       const raw = localStorage.getItem('puzzle-room:last-played');
-      if (raw) { const url = new URL(raw, location.origin); if (url.origin === location.origin && url.pathname === '/games/fivefold/') lastPlayed = url.pathname + url.search; }
+      if (raw) {
+        const url = new URL(raw, location.origin);
+        const game = games.find((game) => game.href === url.pathname);
+        if (url.origin === location.origin && game && resolvePuzzle(game.id, url).identity)
+          lastPlayed = url.pathname + url.search;
+      }
     } catch { /* Guest play remains available without storage. */ }
     return () => { clearInterval(interval); window.removeEventListener('focus', updateDate); };
   });
@@ -20,7 +25,7 @@
 
 <svelte:head>
   <title>Pocket Games</title>
-  <meta name="description" content="Play Fivefold, a daily five-letter word puzzle." />
+  <meta name="description" content="Play Fivefold, a daily word puzzle, and Kings, a daily crown-placement puzzle." />
 </svelte:head>
 
 <main id="main" tabindex="-1">

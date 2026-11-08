@@ -34,6 +34,8 @@
 ## Adding a game
 Read docs/ADDING_GAMES.md first. Add only real playable catalog entries. Every game needs a stable ID, metadata, deterministic generator, accessible component, versioned save validation, statically prerendered lazy route, and behavioral verification. Extend the existing small contracts only when necessary; do not introduce a universal game engine or plugin system.
 
+Use that guide's generator-diversity, puzzle-aware save-validation, native-dialog/keyboard, and loading-recovery checks. A successful build alone is not proof that a route loads and plays.
+
 ## UX invariants
 - Mobile web is the primary surface, not a desktop UI scaled down. Design for 320–430px phone widths and short portrait screens first; retain desktop keyboard support, visible focus, reduced motion, non-color-only feedback, and meaningful live status.
 - Keep primary navigation and actions at least 44px high; compact game keyboards must retain clear, separated keys. Use text-entry font sizes of at least 16px to avoid iOS focus zoom. Never disable browser zoom, require hover, or require landscape orientation to play.
