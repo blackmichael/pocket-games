@@ -3,11 +3,13 @@
 ## 1. Define the mechanic and deterministic inputs
 Choose a stable lowercase route ID. Start with HTML/CSS/SVG; introduce a canvas engine only when it earns its weight. Decide what makes a puzzle valid, how play ends, and what must be saved to resume it.
 
-Use a pure generate(seed) function in src/lib/games/<id>/engine.ts. A generator can have game-specific configuration, but every generation-affecting value must be included in its identity/share link. Current platform links support v1 and standard configuration only: extend these contracts and validation before exposing another configuration or version. Do not add an option that silently reuses another puzzle's save key.
+Use a pure generate(seed) function in src/lib/games/<id>/engine.ts. A generator can have game-specific configuration, but every generation-affecting value must be included in its identity/share link. Both games currently use standard configuration and generator v1. Extend validation before exposing another configuration or version, and never silently reuse an incompatible puzzle's save key.
 
-Daily v1 seed encoding is JSON.stringify(['daily', gameId, chicagoDate, 'standard', 1]). Arbitrary-seed mode passes the exact URL-decoded string, including an empty string, without trimming, case folding, or Unicode normalization. These namespaces need not produce distinct boards; seeds can collide in any finite puzzle space.
+Daily seed encoding is JSON.stringify(['daily', gameId, chicagoDate, 'standard', generatorVersion]), using the game's supported version from dailyIdentity. Use seedIdentity for arbitrary-seed mode, which passes the exact URL-decoded string, including an empty string, without trimming, case folding, or Unicode normalization. These namespaces need not produce distinct boards; seeds can collide in any finite puzzle space.
 
 Use an explicitly defined integer hash/seeded PRNG. Freeze its algorithm, seed encoding, data ordering, and content dependencies. Add a few fixed seed vectors to catch accidental mapping changes. If a generator needs search, use deterministic traversal and work bounds, not timeouts that choose different boards on different devices. Prefer constructing legal puzzles. A Web Worker is warranted when measured generation blocks interaction; import it only from the active game's module and terminate it on disposal.
+
+Measure structural variety, not just the number of seeds: compare king/solution arrangements and region geometry after normalizing color labels, rotations, and reflections. Label shuffles alone do not create new geometry, and fixed color-to-row/column assignments can reveal answers. A constructed legal solution proves solvability, not uniqueness or difficulty; judge completion against the rules rather than only that stored solution. Time generation separately from expensive validation/canonicalization, and report device/runtime, sample size, and tail latency before adding a worker.
 
 For copyrighted data, record the exact source/revision and preserve its required license notice. Never fetch a dictionary or puzzle feed at runtime. Dictionaries belong inside the lazy game dependency graph.
 
@@ -18,29 +20,55 @@ Use Svelte 5 runes and onMount for browser APIs. Do not generate a date-dependen
 
 Small JSON saves use loadSave and saveSave with puzzleKey(identity). Store a separate save-format version, the minimal resumable state, and no redundant derived board unless necessary. These localStorage APIs are synchronous: keep writes small and outside animation loops; debounce high-frequency input. Storage failure must leave a playable in-memory session and display a warning.
 
+Validate saves against the selected puzzle, not only JSON shape and generic board rules. Kings needs the generated regions just as Fivefold needs its answer: two kings can satisfy row/column/non-touching checks but still conflict in one colored region. Reject invalid partial and completed records with a truthful warning and fresh-board recovery. Generator and save-format versions are independent; an unpublished generator rename must not accidentally make incompatible old positions valid again.
+
 Include clear instructions, accessible state descriptions, non-color-only feedback, visible focus, reduced motion, mobile-friendly controls, and an unambiguous result. Use puzzleUrl(identity, location.origin) for pinned share links. Clipboard failure needs a manual-copy alternative.
 
+Match the shared single-card layout used by Fivefold and Kings: do not add a second outline around the overall playing area. Keep board grids and region boundaries that communicate game rules.
+
 Pocket Games is mobile-web-first. Start the layout at 320–430px wide, including short portrait viewports, then enhance it for desktop. Primary navigation and actions need 44px-high touch targets; dense game keyboards need clear key separation and readable labels. Text inputs and copy textareas use at least 16px type to avoid iOS focus zoom. Do not require hover or landscape, block browser zoom, or hide controls beneath fixed overlays. Keep the board and controls together where practical and allow vertical scrolling on very short screens.
+
+### Interaction lifecycle lessons
+- Keep a start gate local to the board and render a seed-independent decorative preview until Start/Resume. A translucent layer over the actual regions still leaks the puzzle. This is a UX gate, not a security boundary.
+- Define timer policy explicitly. For Kings-style gated puzzles, persist accumulated active duration, start only on Start/Resume, freeze on completion, and exclude gate waiting and closed-page time. Use monotonic timing during a session rather than wall-clock deltas across reloads.
+- Native showModal() focuses a control even without autofocus, and closing restores the opener. Implement the required focus policy explicitly; do not hide keyboard focus outlines as a workaround. The shared New seed dialog leaves no control focused on open/close while preserving intentional Tab navigation and native Escape.
+- With no modal control focused, key events can target the page body and bypass the dialog's own handlers. Isolate those events from game-level keyboard listeners without blocking text fields or browser default actions.
+- Successful copying uses a brief, non-blocking live-region toast rather than inserting content that shifts controls. Reset its lifetime on repeated success and clean it up on unmount. Keep copy failures and selectable manual-copy text persistent; feedback must not steal focus.
 
 ## 3. Add the lazy route and catalog entry
 Create src/routes/games/<id>/+page.svelte. Follow the Fivefold route's lifecycle without importing its engine. Dynamically import only your component in the browser. Resolve query parameters with resolvePuzzle(gameId, url), using the platform's Chicago calendar date. Do not invoke generate() in a route load function or preload hook.
 
+Use #lib/platform/PuzzlePicker.svelte in the route header, passing gameId and the current identity (or null while resolving). Its New seed dialog owns custom-seed, date, random, and today navigation; do not duplicate per-game picker forms. Keep game components and engines out of this shared component.
+
 Keep a selected board's identity fixed across midnight. Recheck the Chicago date on focus, visibility return, and a coarse interval; offer the new daily rather than replacing an active game. No daily rebuild or scheduling is needed.
 
-The platform currently supports generator version 1. Before introducing v2, extend PuzzleIdentity and route validation, add a per-game effective-date version schedule, dispatch the correct generator, and retain old behavior needed by published links/saves. Do not rewrite a historical daily's version because today's code changed.
+Both games currently use generator v1. Kings' varied generator is its first release implementation; pre-publication experiments are not compatibility targets. Its independent save-format version rejects earlier unpublished boards. For future published upgrades, add per-game effective-date schedules and retain the versions required to reproduce historical daily puzzles, shared links, and saved progress.
 
 Add the route to vite.config.ts prerender entries and add a metadata-only entry in src/lib/catalog.ts. Shared catalog code must never import your component, rules, data, worker, or engine, even through a barrel export. Keep preload options disabled unless a measured change justifies intent-based loading. Keep catalog entries compact; never embed live game instances.
 
 Catalog card backgrounds automatically cycle through the gameCardColors array in src/routes/+page.svelte by catalog order. Do not import game code for styling or add dummy games to fill out the palette. Keep card text and focus outlines dark enough for every background.
 
-The home page last-played link currently recognizes Fivefold. Extend that allowlist to registered catalog routes when adding a game; never trust an arbitrary stored URL or cross-origin navigation.
+The home page validates last-played links against the metadata catalog. Preserve its same-origin, registered-route check when adding a game; never trust an arbitrary stored URL or cross-origin navigation.
 
 ## 4. Verify the contract
 - Unit-check legal/illegal moves, boundaries, completion, corrupted saves, generator invariants, and fixed seed vectors.
 - Sample many seeds for validity; compare output across supported browsers/worker contexts if applicable. Quantify generation cost on a lower-powered device before claiming it is fast.
 - Run npm run check, npm test, npm run build.
-- Serve build with npm run preview. Open the catalog first and inspect fetched resources: no game or dictionary chunks. Open your game and confirm unrelated games stay unloaded.
+- Verify the actual preview process, origin, and port the user is accessing, not only a newly started server on another port. After every rebuild, stop and restart that preview, then reload browser tabs opened against the previous build. A stale preview can serve HTML whose hashed JavaScript requests return 404.
+- Open the catalog first and inspect fetched resources: no game or dictionary chunks. Exercise direct game URLs, catalog-to-game navigation, and navigation between games; confirm unrelated games stay unloaded. A successful direct load does not prove client-side navigation works.
+- Exercise a failed route-module request: the shared error page must offer a full-page reload preserving the complete puzzle URL and saves, plus catalog navigation. Recovery controls do not establish or fix the underlying cause.
 - Actually play with keyboard and touch/click. Exercise rejected moves, win/loss, refresh with a partial draft, route changes, pinned sharing, unavailable storage/clipboard, and a narrow viewport.
+- Verify clipboard success with actual copy/paste as well as missing/rejected write APIs. Clipboard read permission can be denied while writes work; readText() failure alone does not establish a sharing failure. Check toast expiry, repeated-copy timing, and persistent error recovery.
+- Exercise New seed: cancel preserves the active board; custom seeds (including empty and Unicode), pinned dates, random puzzles, and today's Chicago daily navigate correctly. Modal keys must not reach game handlers, including while no control is focused. Check Escape and intentional Tab navigation within the modal; opening and closing must leave no control focused. In browser automation, wait for both the closed state and the final focus state before sending follow-up keys.
 - Inspect 320px, 375px, and 390px phone layouts, a short portrait viewport, and landscape. Check touch targets, text entry, browser zoom support, scroll reachability, and no horizontal overflow. Desktop interaction is additional coverage, not a substitute for phone verification.
 - Exercise the Chicago midnight boundary and both DST transitions. No 24-hour date arithmetic or UTC-day shortcuts.
 - Update README, any changed authoring guidance, and dictionary attribution. Use Git history for change tracking; no separate changelog is required. Do not add placeholders or nonfunctional catalog games.
+
+### Debugging loading and navigation failures
+- Start with the user's exact failing URL and navigation sequence. If multiple games fail, inspect shared client startup before changing an individual game's lifecycle or generator.
+- Trace the served HTML to its startup script, route module, game component, and required styles. Inspect console exceptions and failed network requests. HTTP 200 for the document can still leave the prerendered loading shell visible when JavaScript fails.
+- Reproduce a concrete failure before editing. Do not guess at `onMount`, effects, or navigation callbacks merely because loading stalls. A generic 500 is a symptom; a deliberately failed module request reproducing it does not prove that the user's original exception had the same cause.
+- Keep verification levels distinct: check/tests/build, asset delivery, direct hydration, client-side navigation, and actual browser interaction each cover different failures. Passing an earlier level is not proof of a later one.
+- Use available, authorized browser tooling; do not turn debugging into an unrequested browser installation. If browser execution is unavailable, a throwaway DOM/ESM diagnostic can exercise the served bootstrap, navigation, input, and failure recovery. Report that limitation explicitly: it does not verify browser compatibility or visual layout. Remove temporary diagnostics afterward.
+- Distinguish diagnostic-harness failures from application failures: missing native DOM APIs or an incorrectly linked diagnostic ESM graph are not evidence of a production defect. Trace failures to the served application before changing its lifecycle or imports.
+

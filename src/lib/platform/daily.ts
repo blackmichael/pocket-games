@@ -24,15 +24,21 @@ export function dailyIdentity(gameId: string, date: string): PuzzleIdentity {
     seed: JSON.stringify(['daily', gameId, date, 'standard', generatorVersion]) };
 }
 
+export function seedIdentity(gameId: string, seed: string): PuzzleIdentity {
+  const generatorVersion = 1;
+  return { gameId, mode: 'seed', seed, generatorVersion };
+}
+
 export function resolvePuzzle(gameId: string, url: URL, now = new Date()): { identity: PuzzleIdentity | null; error: string | null } {
   const params = url.searchParams;
   if (['date', 'seed', 'v'].some((key) => params.getAll(key).length > 1))
-    return { identity: null, error: 'This puzzle link contains repeated parameters. Choose a date or seed below.' };
+    return { identity: null, error: 'This puzzle link contains repeated parameters. Open New seed to choose a date or seed.' };
   if (params.has('date') && params.has('seed'))
     return { identity: null, error: 'Choose either a daily date or a custom seed, not both.' };
-  if (params.has('v') && params.get('v') !== '1')
-    return { identity: null, error: 'This generator version is not available. Version 1 is supported.' };
-  if (params.has('seed')) return { identity: { gameId, mode: 'seed', seed: params.get('seed')!, generatorVersion: 1 }, error: null };
+  const version = '1';
+  if (params.has('v') && params.get('v') !== version)
+    return { identity: null, error: 'This generator version is not available for this game.' };
+  if (params.has('seed')) return { identity: seedIdentity(gameId, params.get('seed')!), error: null };
   const date = params.get('date') ?? chicagoDate(now);
   if (!isCalendarDate(date)) return { identity: null, error: 'That date is not valid. Use a calendar date in YYYY-MM-DD format.' };
   return { identity: dailyIdentity(gameId, date), error: null };
