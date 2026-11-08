@@ -15,7 +15,7 @@
 
   let { identity }: { identity: PuzzleIdentity } = $props();
 
-  const keyboardRows = ['QWERTYUIOP'.split(''), 'ASDFGHJKL'.split(''), ['Backspace', ...'ZXCVBNM', 'Enter']];
+  const keyboardRows = ['QWERTYUIOP'.split(''), 'ASDFGHJKL'.split(''), ['Enter', ...'ZXCVBNM', 'Backspace']];
   const ranks: Record<LetterState, number> = { absent: 0, present: 1, correct: 2 };
   const marks: Record<LetterState, string> = { absent: '×', present: '●', correct: '✓' };
   const descriptions: Record<LetterState, string> = {
