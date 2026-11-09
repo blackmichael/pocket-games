@@ -17,7 +17,6 @@
 
   const keyboardRows = ['QWERTYUIOP'.split(''), 'ASDFGHJKL'.split(''), ['Enter', ...'ZXCVBNM', 'Backspace']];
   const ranks: Record<LetterState, number> = { absent: 0, present: 1, correct: 2 };
-  const marks: Record<LetterState, string> = { absent: '×', present: '●', correct: '✓' };
   const descriptions: Record<LetterState, string> = {
     absent: 'no matching copy',
     present: 'in the word, different position',
@@ -48,7 +47,7 @@
         ? `Solved in ${guesses.length} ${guesses.length === 1 ? 'guess' : 'guesses'}.`
         : finished
           ? `All six guesses used. The word was ${answer}.`
-          : message || 'Type a five-letter word, then press Enter.'
+          : message || 'Enter a five-letter word.'
   );
   const keyboardStates = $derived.by(() => {
     const states: Record<string, LetterState> = {};
@@ -88,18 +87,18 @@
     if (!ready || finished) return;
     if (key === 'Enter') {
       if (draft.length !== WORD_LENGTH) {
-        message = `Add ${WORD_LENGTH - draft.length} more ${WORD_LENGTH - draft.length === 1 ? 'letter' : 'letters'} before submitting.`;
+        message = `Add ${WORD_LENGTH - draft.length} more ${WORD_LENGTH - draft.length === 1 ? 'letter' : 'letters'}.`;
         inputError = true;
         return;
       }
       if (!isAllowedGuess(draft)) {
-        message = `${draft} isn’t in our word list. Try another five-letter word.`;
+        message = 'Not in our word list.';
         inputError = true;
         return;
       }
       guesses = [...guesses, draft];
       draft = '';
-      message = 'Guess recorded. Use the clues to find your next word.';
+      message = 'Guess recorded. Try another word.';
       inputError = false;
       persist();
       return;
@@ -193,7 +192,6 @@
             aria-hidden="true"
           >
             <span class="tile-letter">{row.word[column] ?? ''}</span>
-            {#if state}<span class="tile-mark">{marks[state]}</span>{/if}
           </div>
         {/each}
       </div>
@@ -201,9 +199,9 @@
   </div>
 
   <div class="color-key" aria-label="Letter feedback key">
-    <span><span class="legend-symbol correct-symbol" aria-hidden="true">✓</span> Right spot</span>
-    <span><span class="legend-symbol present-symbol" aria-hidden="true">●</span> Wrong spot</span>
-    <span><span class="legend-symbol absent-symbol" aria-hidden="true">×</span> No match</span>
+    <span><span class="legend-swatch correct-color" aria-hidden="true"></span> Right spot</span>
+    <span><span class="legend-swatch present-color" aria-hidden="true"></span> Wrong spot</span>
+    <span><span class="legend-swatch absent-color" aria-hidden="true"></span> No match</span>
   </div>
 
   <p id="fivefold-status" class="game-status" class:error={inputError && !finished} role="status" aria-live="polite" aria-atomic="true">{status}</p>
@@ -250,7 +248,6 @@
             {:else}
               <span>{key}</span>
             {/if}
-            {#if state}<span class="key-mark" aria-hidden="true">{marks[state]}</span>{/if}
           </button>
         {/each}
       </div>
@@ -262,11 +259,11 @@
     <div class="instructions">
       <p>Find the hidden five-letter word in six guesses. Enter a word using your keyboard or the keys above, then press <strong>Enter</strong>. Each guess must be in our word list.</p>
       <ul>
-        <li><strong>✓ Right spot:</strong> that letter is exactly where it belongs.</li>
-        <li><strong>● Wrong spot:</strong> the word contains that letter, but elsewhere.</li>
-        <li><strong>× No match:</strong> there is no remaining copy of that letter to match.</li>
+        <li><strong>Green — right spot:</strong> that letter is exactly where it belongs.</li>
+        <li><strong>Yellow — wrong spot:</strong> the word contains that letter, but elsewhere.</li>
+        <li><strong>Gray — no match:</strong> there is no remaining copy of that letter to match.</li>
       </ul>
-      <p>Repeated letters count individually. If you guess two Es and the answer has only one, just one E gets a ✓ or ●. Correct positions are matched first, then remaining copies from left to right.</p>
+      <p>Repeated letters count individually. If you guess two Es and the answer has only one, just one E turns green or yellow. Correct positions are matched first, then remaining copies from left to right.</p>
       <p>The keyboard keeps each letter’s best clue. Your progress is saved in this browser when storage is available. Sharing reveals the pattern of your guesses, never the word.</p>
     </div>
   </details>
@@ -298,7 +295,6 @@
   .board-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
 
   .tile {
-    position: relative;
     display: grid;
     place-items: center;
     aspect-ratio: 1;
@@ -313,10 +309,9 @@
   .tile-letter { font-size: clamp(1.45rem, 7vw, 1.95rem); font-weight: 800; }
   .current .tile { border-color: var(--accent-line); }
   .current .tile.filled { border-color: var(--accent); background: var(--page); }
-  .tile-mark { position: absolute; right: 4px; bottom: 3px; font-size: 0.68rem; font-weight: 800; }
   .tile.correct, .key.correct { background: #22724f; border-color: #22724f; color: #fff; }
-  .tile.present, .key.present { background: #f1d98a; border-color: #d8bb60; color: #49380e; }
-  .tile.absent, .key.absent { background: #627087; border-color: #627087; color: #fff; }
+  .tile.present, .key.present { background: #f5cd47; border-color: #d6ad26; color: #49380e; }
+  .tile.absent, .key.absent { background: #6b778a; border-color: #6b778a; color: #fff; }
 
   .color-key {
     display: flex;
@@ -329,10 +324,10 @@
   }
 
   .color-key > span { display: inline-flex; align-items: center; gap: 0.3rem; }
-  .legend-symbol { display: inline-grid; place-items: center; width: 17px; height: 17px; border-radius: 3px; font-size: 0.7rem; font-weight: 800; }
-  .correct-symbol { background: #22724f; color: #fff; }
-  .present-symbol { background: #f1d98a; color: #49380e; }
-  .absent-symbol { background: #627087; color: #fff; }
+  .legend-swatch { width: 17px; height: 17px; border-radius: 3px; }
+  .correct-color { background: #22724f; }
+  .present-color { background: #f5cd47; }
+  .absent-color { background: #6b778a; }
 
   .game-status {
     display: flex;
@@ -353,7 +348,6 @@
   .middle-row { padding-inline: 5%; }
 
   .key {
-    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -375,7 +369,6 @@
   }
 
   .key.action-key { flex-grow: 1.55; font-size: 0.68rem; }
-  .key-mark { position: absolute; right: 3px; bottom: 2px; font-size: 0.58rem; line-height: 1; }
   .key:disabled { cursor: default; }
   .keyboard[aria-describedby] .key:disabled:not(.correct):not(.present):not(.absent) { color: #666; background: #f3f3f3; }
   .key:active:not(:disabled) { transform: translateY(1px); border-bottom-width: 1px; }
