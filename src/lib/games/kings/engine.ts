@@ -125,11 +125,12 @@ export function isLegalPlacement(selected: readonly number[], cell: number): boo
   }
   return true;
 }
-/** Selected kings that clash with a valid board square, including its region. */
+/** Other selected kings that clash with a valid board square, including its region. */
 export function placementConflicts(selected: readonly number[], cell: number, puzzle: Puzzle): number[] {
   const row = Math.floor(cell / SIZE);
   const column = cell % SIZE;
   return selected.filter((existing) => {
+    if (existing === cell) return false;
     const otherRow = Math.floor(existing / SIZE);
     const otherColumn = existing % SIZE;
     return row === otherRow || column === otherColumn ||
@@ -163,19 +164,15 @@ export function isSolved(selected: readonly number[], puzzle: Puzzle): boolean {
 export function parseSavedGame(value: unknown, puzzle: Puzzle): SavedGame | null {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return null;
   const record = value as Record<string, unknown>;
-  if (record.version !== SAVE_VERSION || !Array.isArray(record.selected) || record.selected.length > SIZE) return null;
+  if (record.version !== SAVE_VERSION || !Array.isArray(record.selected) || record.selected.length > SIZE * SIZE) return null;
   const selected: number[] = [];
-  let usedRegions = 0;
   for (const cell of record.selected) {
-    if (typeof cell !== 'number' || !isLegalPlacement(selected, cell)) return null;
-    const regionBit = 1 << puzzle.regions[cell];
-    if ((usedRegions & regionBit) !== 0) return null;
-    usedRegions |= regionBit;
+    if (typeof cell !== 'number' || !Number.isInteger(cell) || cell < 0 || cell >= SIZE * SIZE || selected.includes(cell)) return null;
     selected.push(cell);
   }
   const elapsedMs = record.elapsedMs;
   if (elapsedMs === null) {
-    if (selected.length !== SIZE) return null;
+    if (!isSolved(selected, puzzle)) return null;
   } else if (typeof elapsedMs !== 'number' || !Number.isSafeInteger(elapsedMs) || elapsedMs < 0) {
     return null;
   }

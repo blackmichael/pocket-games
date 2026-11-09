@@ -18,9 +18,7 @@
   let solved = $state(false);
   let elapsedMs = $state(0);
   let timeRecorded = $state(true);
-  let invalidCell = $state<number | null>(null);
-  let conflicts = $state<number[]>([]);
-  let invalidAttempt = $state(0);
+  const conflicts = $derived(selected.filter((cell) => placementConflicts(selected, cell, puzzle).length > 0));
   let celebrating = $state(false);
   let shareText = $state('');
   let shareMessage = $state('');
@@ -97,44 +95,22 @@
     boardElement?.querySelector<HTMLButtonElement>('button')?.focus();
   }
 
-  function clearFeedback() {
-    invalidCell = null;
-    conflicts = [];
-  }
-
   function toggle(cell: number) {
     if (!ready || !started || solved) return;
     updateElapsed();
-    clearFeedback();
     if (selected.includes(cell)) {
       selected = selected.filter((placed) => placed !== cell);
       message = `King removed. ${selected.length} of ${SIZE} kings placed.`;
     } else {
-      const clashes = placementConflicts(selected, cell, puzzle);
-      if (clashes.length) {
-        invalidCell = cell;
-        conflicts = clashes;
-        invalidAttempt += 1;
-        const other = clashes[0];
-        const row = Math.floor(cell / SIZE);
-        const column = cell % SIZE;
-        const otherRow = Math.floor(other / SIZE);
-        const otherColumn = other % SIZE;
-        const reason = row === otherRow ? 'another king is in this row'
-          : column === otherColumn ? 'another king is in this column'
-          : Math.abs(row - otherRow) <= 1 && Math.abs(column - otherColumn) <= 1
-            ? 'kings cannot touch, even diagonally' : 'another king is in this region';
-        message = `Not placed at row ${row + 1}, column ${column + 1}: ${reason}.`;
-        return;
-      }
       selected = [...selected, cell];
-      solved = isSolved(selected, puzzle);
-      if (solved) {
-        stopClock();
-        celebrating = true;
-        celebrationHandle = window.setTimeout(() => { celebrating = false; }, 1600);
-        message = `Solved in ${elapsedText}. All ten kings are in place.`;
-      } else message = `${selected.length} of ${SIZE} kings placed.`;
+      message = `${selected.length} of ${SIZE} kings placed.`;
+    }
+    solved = isSolved(selected, puzzle);
+    if (solved) {
+      stopClock();
+      celebrating = true;
+      celebrationHandle = window.setTimeout(() => { celebrating = false; }, 1600);
+      message = `Solved in ${elapsedText}. All ten kings are in place.`;
     }
     persist();
   }
@@ -142,7 +118,6 @@
   function reset() {
     if (!ready || !started || solved) return;
     selected = [];
-    clearFeedback();
     message = 'Board cleared. The timer is still running.';
     persist();
   }
@@ -215,26 +190,24 @@
           {#each Array(SIZE) as __, column}
             {@const cell = row * SIZE + column}
             {@const region = puzzle.regions[cell]}
+            {@const conflicting = conflicts.includes(cell)}
             <button
               class="cell region-{region}"
               class:chosen={selected.includes(cell)}
-              class:invalid={invalidCell === cell}
-              class:conflicting={conflicts.includes(cell)}
+              class:conflicting
               class:region-right={column < SIZE - 1 && puzzle.regions[cell + 1] !== region}
               class:region-bottom={row < SIZE - 1 && puzzle.regions[cell + SIZE] !== region}
               type="button"
               role="gridcell"
-              aria-label="Row {row + 1}, column {column + 1}, region {region + 1}{selected.includes(cell) ? ', king placed' : ', empty'}"
+              aria-label="Row {row + 1}, column {column + 1}, region {region + 1}{selected.includes(cell) ? ', king placed' : ', empty'}{conflicting ? ', conflicting placement' : ''}"
               aria-selected={selected.includes(cell)}
-              aria-invalid={invalidCell === cell ? 'true' : undefined}
-              aria-describedby={invalidCell === cell || conflicts.includes(cell) ? 'kings-status' : undefined}
+              aria-invalid={conflicting ? 'true' : undefined}
+              aria-describedby={conflicting ? 'kings-status' : undefined}
               disabled={!ready || solved}
               onclick={() => toggle(cell)}
             >
               {#if selected.includes(cell)}{@render crown()}{/if}
-              {#if invalidCell === cell}
-                {#key invalidAttempt}<span class="invalid-mark" aria-hidden="true">×</span>{/key}
-              {/if}
+              {#if conflicting}<span class="invalid-mark" aria-hidden="true">×</span>{/if}
             </button>
           {/each}
         </div>
@@ -261,7 +234,7 @@
       </div>
     {/if}
   </div>
-  <p id="kings-status" class="status" class:empty={!message} class:error={invalidCell !== null} role="status" aria-live="polite" aria-atomic="true">{message}</p>
+  <p id="kings-status" class="status" class:empty={!message && !conflicts.length} class:error={conflicts.length > 0} role="status" aria-live="polite" aria-atomic="true">{#if conflicts.length}{conflicts.length} crowns conflict. Marked crowns share a row, column, or region, or touch. Tap a crown to remove it.{:else}{message}{/if}</p>
   {#if solved}
     <section class="result" class:celebrating aria-labelledby="kings-result-heading">
       <div class="result-crown" aria-hidden="true">{@render crown()}</div>
@@ -289,7 +262,7 @@
   {:else}
     <button class="text-link clear-button" type="button" onclick={reset} disabled={!ready || !started || selected.length === 0}>Clear board</button>
   {/if}
-  <details><summary>How to play</summary><p>Choose ten squares. Use each row, column, and colored region exactly once. No two kings may share an edge or corner. Tap a placed king to remove it. A rejected move marks the square with × and outlines the conflicting kings.</p><p>Select Start puzzle or Resume puzzle to uncover the board and start the timer. It stops when you solve the puzzle. Your board and elapsed time are saved in this browser; time before starting or with the page closed does not count.</p></details>
+  <details><summary>How to play</summary><p>Choose ten squares. Use each row, column, and colored region exactly once. No two kings may share an edge or corner. Tap a placed king to remove it. Conflicting crowns stay on the board, outlined and marked with × until you resolve their placements.</p><p>Select Start puzzle or Resume puzzle to uncover the board and start the timer. It stops when you solve the puzzle. Your board and elapsed time are saved in this browser; time before starting or with the page closed does not count.</p></details>
   <div class="copy-toast" role="status" aria-live="polite" aria-atomic="true">
     {#if showCopyToast}<span>Result copied.</span>{/if}
   </div>
@@ -318,9 +291,8 @@
   .cell:last-child { border-right: 0; }
   .board-row:last-child .cell { border-bottom: 0; }
   .cell:focus-visible { z-index: 2; outline: 3px solid var(--accent); outline-offset: -3px; }
-  .cell.invalid { box-shadow: inset 0 0 0 2px var(--invalid); background-image: repeating-linear-gradient(135deg, transparent, transparent 4px, #a3263d20 4px, #a3263d20 8px); }
   .cell.conflicting { box-shadow: inset 0 0 0 2px var(--invalid); }
-  .invalid-mark { display: grid; place-items: center; width: 78%; height: 78%; border-radius: 50%; color: var(--invalid); background: #fff; font-size: clamp(1rem, 5vw, 1.75rem); font-weight: 800; line-height: 1; animation: rejected .22s ease-out; }
+  .invalid-mark { position: absolute; right: 1px; bottom: 1px; display: grid; place-items: center; width: 42%; height: 42%; border: 1px solid var(--invalid); border-radius: 50%; color: var(--invalid); background: #fff; font-size: clamp(.75rem, 3vw, 1.1rem); font-weight: 800; line-height: 1; pointer-events: none; }
   .region-0 { background: #f4d8cd; }.region-1 { background: #d8e8bd; }.region-2 { background: #d3e4ef; }.region-3 { background: #ead9f2; }.region-4 { background: #f3e9b8; }.region-5 { background: #d0e9df; }
   .region-6 { background: #edcede; }.region-7 { background: #d9d8f0; }.region-8 { background: #f0dfbf; }.region-9 { background: #cce7e9; }
   .crown { display: block; width: 94%; height: 94%; overflow: visible; }
@@ -355,11 +327,10 @@
   details { text-align: left; border-top: 1px solid var(--line); margin-top: 18px; }
   summary { min-height: 44px; padding-top: 14px; cursor: pointer; }
   details p { color: var(--muted); font-size: .85rem; line-height: 1.6; }
-  @keyframes rejected { from { transform: scale(.6); } to { transform: scale(1); } }
   @keyframes coronation { 0% { transform: translateY(12px) scale(.7) rotate(-8deg); } 65% { transform: translateY(-5px) scale(1.1) rotate(4deg); } 100% { transform: none; } }
   @keyframes confetti-fall { 0% { opacity: 0; transform: translate(0, -16px) rotate(0); } 12% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--drift), 390px) rotate(var(--spin)); } }
   @media (prefers-reduced-motion: reduce) {
-    .invalid-mark, .result.celebrating .result-crown { animation: none; }
+    .result.celebrating .result-crown { animation: none; }
     .confetti { display: none; }
   }
 </style>

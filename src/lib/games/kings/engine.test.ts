@@ -194,6 +194,14 @@ describe('Kings placement rules', () => {
     expect(isLegalPlacement([44], 77)).toBe(true);
     expect(placementConflicts([44], 77, { ...rowRegions, regions })).toEqual([44]);
   });
+
+  it('reports only other crowns and clears conflicts when either crown is removed', () => {
+    expect(placementConflicts([44], 44, rowRegions)).toEqual([]);
+    expect(placementConflicts([44, 55, 99], 44, rowRegions)).toEqual([55]);
+    expect(placementConflicts([44, 55, 99], 55, rowRegions)).toEqual([44]);
+    expect(placementConflicts([55, 99], 55, rowRegions)).toEqual([]);
+    expect(placementConflicts([44, 99], 44, rowRegions)).toEqual([]);
+  });
 });
 
 describe('Kings completion', () => {
@@ -249,10 +257,19 @@ describe('Kings saved games', () => {
       .toEqual({ version: 3, selected, elapsedMs: null });
   });
 
-  it('rejects region-conflicting partial and completed saves', () => {
+  it.each([
+    { reason: 'shared row', selected: [0, 2] },
+    { reason: 'shared column', selected: [0, 10] },
+    { reason: 'touching diagonal', selected: [0, 11] },
+    { reason: 'shared region', selected: [0, 12] },
+    { reason: 'over ten crowns', selected: [...legalCells, 98] },
+    { reason: 'every square occupied', selected: Array.from({ length: SIZE * SIZE }, (_, cell) => cell) },
+  ])('restores unfinished boards with $reason', ({ selected }) => {
     const puzzle = generate('fixed-seed');
-    expect(parseSavedGame({ version: 3, selected: [0, 12], elapsedMs: 1000 }, puzzle)).toBeNull();
-    expect(parseSavedGame({ version: 3, selected: legalCells, elapsedMs: null }, puzzle)).toBeNull();
+    expect(parseSavedGame({ version: 3, selected, elapsedMs: 1000 }, puzzle))
+      .toEqual({ version: 3, selected, elapsedMs: 1000 });
+    expect(isSolved(selected, puzzle)).toBe(false);
+    expect(parseSavedGame({ version: 3, selected, elapsedMs: null }, puzzle)).toBeNull();
   });
 
   it.each([-1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1, '1000', undefined, null])
@@ -261,9 +278,6 @@ describe('Kings saved games', () => {
     });
 
   it.each([
-    { reason: 'shared row', selected: [0, 2] },
-    { reason: 'shared column', selected: [0, 10] },
-    { reason: 'touching diagonal', selected: [0, 11] },
     { reason: 'duplicate', selected: [0, 0] },
     { reason: 'negative index', selected: [-1] },
     { reason: 'index beyond the board', selected: [100] },
@@ -272,7 +286,7 @@ describe('Kings saved games', () => {
     { reason: 'infinite index', selected: [Infinity] },
     { reason: 'string index', selected: ['99'] },
     { reason: 'null index', selected: [null] },
-    { reason: 'too many kings', selected: [...legalCells, 98] },
+    { reason: 'too many cells', selected: Array.from({ length: SIZE * SIZE + 1 }, (_, cell) => cell) },
   ])('rejects saved positions with $reason', ({ selected }) => {
     expect(parseSavedGame({ version: 3, selected, elapsedMs: 0 }, rowRegions)).toBeNull();
   });
