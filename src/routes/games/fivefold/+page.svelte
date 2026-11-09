@@ -5,6 +5,9 @@
   import { chicagoDate, dailyIdentity, displayDate, resolvePuzzle } from '#lib/platform/daily.js';
   import { puzzleKey, puzzleUrl, type PuzzleIdentity } from '#lib/platform/types.js';
   import PuzzlePicker from '#lib/platform/PuzzlePicker.svelte';
+  import { games } from '#lib/catalog.js';
+
+  const game = games.find((game) => game.id === 'fivefold')!;
 
   let Game = $state<Component<{ identity: PuzzleIdentity }> | null>(null);
   let identity = $state<PuzzleIdentity | null>(null);
@@ -58,7 +61,7 @@
   <header class="game-heading">
     <div>
       <h1>Fivefold</h1>
-      <p>Five letters, six guesses.</p>
+      <p>{game.description}</p>
     </div>
     <PuzzlePicker gameId="fivefold" {identity} />
   </header>

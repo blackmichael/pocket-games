@@ -5,6 +5,10 @@ export const games = [
     title: 'Fivefold',
     category: 'Words & deduction',
     description: 'Guess the five-letter word in six tries.',
+    preview: {
+      src: '/previews/fivefold.webp',
+      alt: 'Fivefold board with letter guesses and green, yellow, and gray feedback.'
+    },
     duration: '3–5 minutes',
     href: '/games/fivefold/'
   },
@@ -13,6 +17,10 @@ export const games = [
     title: 'Kings',
     category: 'Logic',
     description: 'Place ten kings without sharing any land.',
+    preview: {
+      src: '/previews/kings.webp',
+      alt: 'Kings board with crowns placed in different colored regions.'
+    },
     duration: '2–5 minutes',
     href: '/games/kings/'
   }

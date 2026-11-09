@@ -44,9 +44,15 @@ Keep a selected board's identity fixed across midnight. Recheck the Chicago date
 
 Both games currently use generator v1. Kings' varied generator is its first release implementation; pre-publication experiments are not compatibility targets. Its independent save-format version rejects earlier unpublished boards. For future published upgrades, add per-game effective-date schedules and retain the versions required to reproduce historical daily puzzles, shared links, and saved progress.
 
-Add the route to vite.config.ts prerender entries and add a metadata-only entry in src/lib/catalog.ts. Shared catalog code must never import your component, rules, data, worker, or engine, even through a barrel export. Keep preload options disabled unless a measured change justifies intent-based loading. Keep catalog entries compact; never embed live game instances.
+Add the route to vite.config.ts prerender entries and add a metadata-only entry in src/lib/catalog.ts. Read that entry's description for the game screen subheader so it stays in sync with the catalog card. Shared catalog code must never import your component, rules, data, worker, or engine, even through a barrel export. Keep preload options disabled unless a measured change justifies intent-based loading. Keep catalog entries compact; never embed live game instances.
+
+Each catalog entry includes preview.src and preview.alt. Use a local 256×256 WebP under static/previews/ with a concise description of the visible board. Capture a fixed seeded sample, not a daily puzzle or the player's progress; the catalog must load only the image, never render a live game to make its thumbnail. Current captures use Fivefold seed catalog-preview with guesses CRANE, SHOUT, BLIMP, and Kings seed fixed-seed with crowns at zero-based cells 6, 14, 22, 35, 49. Frame the complete board on white with a 10px inset.
+
+Keep preview thumbnails at the right edge of catalog cards on phone and desktop layouts, vertically centered across the full card rather than just the copy row. Group category and duration together below the copy. Use compact 16px card padding and an 8px gap above the metadata without shrinking the title's 44px tap target. Reserve at least two lines for each description and keep catalog rows equal-height; unusually long descriptions must expand the cards together rather than be clipped.
 
 Catalog card backgrounds automatically cycle through the gameCardColors array in src/routes/+page.svelte by catalog order. Do not import game code for styling or add dummy games to fill out the palette. Keep card text and focus outlines dark enough for every background.
+
+Wrap each catalog card in one native link named by its game heading and described by its summary. The preview, metadata, and card padding must all navigate to the same game. Use a visible full-card keyboard focus outline, keep one tab stop per card, and do not nest links or buttons inside it.
 
 The home page validates last-played links against the metadata catalog. Preserve its same-origin, registered-route check when adding a game; never trust an arbitrary stored URL or cross-origin navigation.
 

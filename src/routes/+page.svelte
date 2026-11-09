@@ -35,14 +35,17 @@
   <ul class="game-list">
     {#each games as game, index}
       <li style:--card-background={gameCardColors[index % gameCardColors.length]}>
-        <div>
-          <h2><a href={game.href}>{game.title}</a></h2>
-          <p>{game.description}</p>
-        </div>
-        <div class="game-info">
-          <span>{game.category}</span>
-          <span>{game.duration}</span>
-        </div>
+        <a class="game-card" href={game.href} aria-labelledby="game-title-{game.id}" aria-describedby="game-description-{game.id}">
+          <div class="game-copy">
+            <h2 id="game-title-{game.id}">{game.title}</h2>
+            <p id="game-description-{game.id}">{game.description}</p>
+          </div>
+          <div class="game-info">
+            <span>{game.category}</span>
+            <span>{game.duration}</span>
+          </div>
+          <img class="game-preview" src={game.preview.src} alt={game.preview.alt} width="256" height="256" />
+        </a>
       </li>
     {/each}
   </ul>
@@ -53,23 +56,25 @@
 </main>
 
 <style>
-  main { width: min(780px, calc(100% - 40px)); margin: 32px auto 0; }
+  main { width: min(720px, calc(100% - 40px)); margin: 24px auto 0; }
   .catalog-date { margin: 0; text-align: center; color: var(--muted); font-size: .85rem; }
-  .game-list { display: grid; gap: 14px; margin: 22px 0 0; padding: 0; list-style: none; }
-  li { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 24px; border: 1px solid transparent; border-radius: 10px; background: var(--card-background); color: var(--ink); }
-  li:hover { border-color: #342a4044; }
-  h2 { margin: 0 0 8px; font-size: 1.3rem; font-weight: 700; }
-  h2 a { display: inline-flex; align-items: center; min-height: 44px; color: inherit; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 5px; }
-  h2 a:hover { text-decoration-thickness: 2px; }
-  h2 a:focus-visible { outline-color: var(--ink); }
-  li p { margin: 0; line-height: 1.6; }
-  .game-info { display: grid; justify-items: end; gap: 10px; flex-shrink: 0; font-size: .8rem; }
+  .game-list { display: grid; grid-auto-rows: 1fr; gap: 12px; margin: 16px 0 0; padding: 0; list-style: none; }
+  li { min-width: 0; }
+  .game-card { display: grid; height: 100%; box-sizing: border-box; grid-template-columns: minmax(0, 1fr) 96px; grid-template-areas: "copy preview" "info preview"; align-items: center; gap: 8px 16px; padding: 16px; border: 1px solid transparent; border-radius: 10px; background: var(--card-background); color: var(--ink); text-decoration: none; }
+  .game-card:hover { border-color: #342a4044; }
+  .game-preview { grid-area: preview; grid-row: 1 / -1; display: block; width: 96px; height: 96px; border-radius: 6px; }
+  .game-copy { grid-area: copy; min-width: 0; }
+  h2 { display: flex; align-items: center; min-height: 44px; margin: 0; font-size: 1.3rem; font-weight: 700; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 5px; }
+  .game-card:hover h2, .game-card:focus-visible h2 { text-decoration-thickness: 2px; }
+  .game-card:focus-visible { outline-color: var(--ink); }
+  li p { min-block-size: 2lh; margin: 0; line-height: 1.45; }
+  .game-info { grid-area: info; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: .8rem; }
   .game-info span:first-child { padding: 4px 8px; background: #ffffff40; border-radius: 4px; }
-  .resume { margin: 22px 0 0; font-size: .9rem; }
+  .resume { margin: 16px 0 0; font-size: .9rem; }
   .resume a { display: inline-flex; align-items: center; min-height: 44px; }
   @media (max-width: 500px) {
-    main { margin-top: 24px; }
-    li { align-items: start; flex-direction: column; gap: 16px; padding: 20px; }
-    .game-info { display: flex; align-items: center; gap: 14px; }
+    main { margin-top: 18px; }
+    .game-card { grid-template-columns: minmax(0, 1fr) 80px; grid-template-areas: "copy preview" "info info"; }
+    .game-preview { width: 80px; height: 80px; }
   }
 </style>

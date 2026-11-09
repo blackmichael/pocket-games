@@ -5,6 +5,9 @@
   import { chicagoDate, dailyIdentity, displayDate, resolvePuzzle } from '#lib/platform/daily.js';
   import { puzzleKey, puzzleUrl, type PuzzleIdentity } from '#lib/platform/types.js';
   import PuzzlePicker from '#lib/platform/PuzzlePicker.svelte';
+  import { games } from '#lib/catalog.js';
+
+  const game = games.find((game) => game.id === 'kings')!;
   let Game = $state<Component<{ identity: PuzzleIdentity }> | null>(null);
   let identity = $state<PuzzleIdentity | null>(null);
   let error = $state<string | null>(null);
@@ -34,7 +37,7 @@
 
 <svelte:head><title>Kings — Pocket Games</title><meta name="description" content="Place ten kings on a ten-by-ten board in a daily logic puzzle. One king per row, column, and colored region; no touching." /></svelte:head>
 <main id="main" tabindex="-1">
-  <header class="heading"><div><h1>Kings</h1><p>Ten kings. No shared lands.</p></div><PuzzlePicker gameId="kings" {identity} /></header>
+  <header class="heading"><div><h1>Kings</h1><p>{game.description}</p></div><PuzzlePicker gameId="kings" {identity} /></header>
   <section class="surface" aria-label="Kings puzzle">
     <div class="meta">{#if identity?.mode === 'daily'}<span>Daily</span><span>{displayDate(identity.date!)}</span>{:else if identity}<span>Practice</span><span class="seed">Seed: {identity.seed || '(empty)'}</span>{:else}<span>Loading puzzle…</span>{/if}</div>
     {#if newDay}<p class="notice">A new daily is available. Your board stays here. <a href={puzzleUrl(dailyIdentity('kings', today), location.origin)}>Play the new daily</a></p>{/if}
