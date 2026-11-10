@@ -37,10 +37,10 @@ Read docs/ADDING_GAMES.md first. Add only real playable catalog entries. Every g
 Use that guide's generator-diversity, puzzle-aware save-validation, native-dialog/keyboard, and loading-recovery checks. A successful build alone is not proof that a route loads and plays.
 
 ## UX invariants
-- Mobile web is the primary surface, not a desktop UI scaled down. Design for 320–430px phone widths and short portrait screens first; retain desktop keyboard support, visible focus, reduced motion, non-color-only feedback, and meaningful live status.
-- Keep primary navigation and actions at least 44px high; compact game keyboards must retain clear, separated keys. Use text-entry font sizes of at least 16px to avoid iOS focus zoom. Never disable browser zoom, require hover, or require landscape orientation to play.
-- Check phone portrait and landscape layouts for overflow and reachable controls. Keep the board and controls together on normal portrait screens; allow scrolling on very short screens instead of shrinking controls beyond usability.
-- Shared chrome stays quiet. Scope game CSS. Never capture keys in text inputs, editable content, or with control/meta/alt modifiers.
+- Mobile web is the primary surface, not a desktop UI scaled down. Design for 320–430px phone widths and short portrait screens first; retain desktop keyboard play.
+- Compact game keyboards must retain clear, separated keys.
+- Keep the board and controls together on normal portrait screens; allow scrolling on very short screens instead of shrinking controls beyond usability.
+- Shared chrome stays quiet. Scope game CSS. Game keyboard handlers must not capture keys in text inputs, editable content, or with control/meta/alt modifiers.
 - Visible copy should explain rules, state, controls, and necessary storage/timezone behavior. Do not add slogans, promotional sections, brand narratives, or descriptions of the site's personality.
 - Use compact navigation, direct game lists, and a single-column playing area. Retain considered typography, restrained color, spacing, and styled controls; avoiding promotional content does not mean removing visual design. Keep decorative catalog artwork and oversized introductions out of the interface.
 - Shared interface colors use the plum/lilac tokens in src/app.css. Reuse those tokens for links, controls, surfaces, borders, and focus. Keep game feedback colors semantically separate; do not recolor correct/present/absent states to match the brand palette.
@@ -53,6 +53,6 @@ Use that guide's generator-diversity, puzzle-aware save-validation, native-dialo
 - Never claim that game performance measures intelligence or clinical cognition.
 
 ## Verification and delivery
-Run check, tests, and static build after changes. Launch the production preview and exercise the actual game in a browser: legal and rejected input, win/loss, duplicate feedback where relevant, refresh/resume, shared link, mobile layout, and unavailable storage. Inspect network resources: catalog must not fetch game/dictionary chunks. Tests should cover rules, seed vectors, validity, state transitions and Chicago boundaries, not wording or source text. Update README or game-authoring guidance when behavior or contracts change, and keep dataset licenses intact. Use Git history for change tracking; a separate changelog is not required.
+Run check, tests, and static build after changes. Launch the production preview and exercise the actual game in a browser: legal and rejected input, win/loss, duplicate feedback where relevant, refresh/resume, shared link, mobile layout, and unavailable storage. Inspect network resources: catalog must not fetch game/dictionary chunks. Tests should cover rules, seed vectors, validity, state transitions, and Chicago boundaries. Keep dataset licenses intact. Use Git history for change tracking; a separate changelog is not required.
 
-Restart an already running production preview after rebuilding: its static-file cache can otherwise serve the previous build. On Linux arm64, use an installed Chromium executable rather than assuming Chrome for Testing is available.
+Restart an already running Vite production preview after rebuilding: its static-file cache can otherwise serve the previous build.
