@@ -3,7 +3,7 @@ export interface PuzzleIdentity {
   mode: 'daily' | 'seed';
   seed: string;
   date?: string;
-  generatorVersion: 1;
+  generatorVersion: 1 | 2;
 }
 
 export function puzzleKey(identity: PuzzleIdentity): string {
@@ -11,7 +11,8 @@ export function puzzleKey(identity: PuzzleIdentity): string {
 }
 
 export function puzzleUrl(identity: PuzzleIdentity, origin: string): string {
-  const url = new URL('/games/' + identity.gameId + '/', origin);
+  const path = identity.gameId === 'sunmoon' ? '/games/catdog/' : '/games/' + identity.gameId + '/';
+  const url = new URL(path, origin);
   if (identity.mode === 'daily') url.searchParams.set('date', identity.date!);
   else url.searchParams.set('seed', identity.seed);
   url.searchParams.set('v', String(identity.generatorVersion));

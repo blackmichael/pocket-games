@@ -23,5 +23,17 @@ export const games = [
     },
     duration: '2–5 minutes',
     href: '/games/kings/'
+  },
+  {
+    id: 'sunmoon',
+    title: 'Catdog',
+    category: 'Logic',
+    description: 'Balance Poppy and Pigeon using neighbor clues.',
+    preview: {
+      src: '/previews/catdog.webp',
+      alt: 'Six-by-six Catdog board with tan dog and gray-and-white cat portraits, and equals and cross clues.'
+    },
+    duration: '3–7 minutes',
+    href: '/games/catdog/'
   }
 ] as const;

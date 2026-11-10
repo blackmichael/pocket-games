@@ -18,14 +18,21 @@ export function isCalendarDate(value: string): boolean {
   return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 }
 
-export function dailyIdentity(gameId: string, date: string): PuzzleIdentity {
-  const generatorVersion = 1;
+const CATDOG_V2_START_DATE = '2026-11-09';
+type GeneratorVersion = PuzzleIdentity['generatorVersion'];
+
+function supportsVersion(gameId: string, version: number): version is GeneratorVersion {
+  return version === 1 || (gameId === 'sunmoon' && version === 2);
+}
+
+export function dailyIdentity(gameId: string, date: string, generatorVersion: GeneratorVersion = gameId === 'sunmoon' && date >= CATDOG_V2_START_DATE ? 2 : 1): PuzzleIdentity {
+  if (!supportsVersion(gameId, generatorVersion)) throw new RangeError('Unsupported generator version for this game.');
   return { gameId, mode: 'daily', date, generatorVersion,
     seed: JSON.stringify(['daily', gameId, date, 'standard', generatorVersion]) };
 }
 
-export function seedIdentity(gameId: string, seed: string): PuzzleIdentity {
-  const generatorVersion = 1;
+export function seedIdentity(gameId: string, seed: string, generatorVersion: GeneratorVersion = gameId === 'sunmoon' ? 2 : 1): PuzzleIdentity {
+  if (!supportsVersion(gameId, generatorVersion)) throw new RangeError('Unsupported generator version for this game.');
   return { gameId, mode: 'seed', seed, generatorVersion };
 }
 
@@ -35,13 +42,18 @@ export function resolvePuzzle(gameId: string, url: URL, now = new Date()): { ide
     return { identity: null, error: 'This puzzle link contains repeated parameters. Open New seed to choose a date or seed.' };
   if (params.has('date') && params.has('seed'))
     return { identity: null, error: 'Choose either a daily date or a custom seed, not both.' };
-  const version = '1';
-  if (params.has('v') && params.get('v') !== version)
-    return { identity: null, error: 'This generator version is not available for this game.' };
-  if (params.has('seed')) return { identity: seedIdentity(gameId, params.get('seed')!), error: null };
+  let version: GeneratorVersion | undefined;
+  if (params.has('v')) {
+    const requested = params.get('v');
+    const parsed = requested === '1' ? 1 : requested === '2' ? 2 : 0;
+    if (!supportsVersion(gameId, parsed))
+      return { identity: null, error: 'This generator version is not available for this game.' };
+    version = parsed;
+  }
+  if (params.has('seed')) return { identity: seedIdentity(gameId, params.get('seed')!, version), error: null };
   const date = params.get('date') ?? chicagoDate(now);
   if (!isCalendarDate(date)) return { identity: null, error: 'That date is not valid. Use a calendar date in YYYY-MM-DD format.' };
-  return { identity: dailyIdentity(gameId, date), error: null };
+  return { identity: dailyIdentity(gameId, date, version), error: null };
 }
 
 export function displayDate(date: string): string {

@@ -14,9 +14,9 @@
       const raw = localStorage.getItem('puzzle-room:last-played');
       if (raw) {
         const url = new URL(raw, location.origin);
-        const game = games.find((game) => game.href === url.pathname);
+        const game = games.find((game) => game.href === url.pathname || (game.id === 'sunmoon' && url.pathname === '/games/sunmoon/'));
         if (url.origin === location.origin && game && resolvePuzzle(game.id, url).identity)
-          lastPlayed = url.pathname + url.search;
+          lastPlayed = game.href + url.search;
       }
     } catch { /* Guest play remains available without storage. */ }
     return () => { clearInterval(interval); window.removeEventListener('focus', updateDate); };
@@ -25,7 +25,7 @@
 
 <svelte:head>
   <title>Pocket Games</title>
-  <meta name="description" content="Play Fivefold, a daily word puzzle, and Kings, a daily crown-placement puzzle." />
+  <meta name="description" content="Play daily word and logic puzzles: Fivefold, Kings, and Catdog." />
 </svelte:head>
 
 <main id="main" tabindex="-1">
