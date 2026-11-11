@@ -32,8 +32,8 @@ describe('Chicago daily identity', () => {
     expect(puzzleKey(identity!)).toBe('["fivefold","daily","2026-01-01","[\\"daily\\",\\"fivefold\\",\\"2026-01-01\\",\\"standard\\",1]",1]');
   });
 
-  it.each(['2020-01-01', '2026-11-08', '2026-11-09', '2027-01-01'])('keeps existing games on v1 for daily %s', (date) => {
-    for (const gameId of ['kings', 'fivefold']) {
+  it.each(['2020-01-01', '2026-11-08', '2026-11-09', '2027-01-01'])('uses v1 for every game on daily %s', (date) => {
+    for (const gameId of ['kings', 'fivefold', 'sunmoon']) {
       const version = 1;
       const identity = dailyIdentity(gameId, date);
       expect(identity).toEqual({
@@ -46,34 +46,6 @@ describe('Chicago daily identity', () => {
   });
 
   it.each([
-    ['2020-01-01', 1], ['2026-11-08', 1], ['2026-11-09', 2], ['2027-01-01', 2]
-  ] as const)('selects the Catdog generator schedule for %s', (date, generatorVersion) => {
-    const identity = dailyIdentity('sunmoon', date);
-    expect(identity).toEqual({
-      gameId: 'sunmoon', mode: 'daily', date, generatorVersion,
-      seed: JSON.stringify(['daily', 'sunmoon', date, 'standard', generatorVersion])
-    });
-    expect(resolve('sunmoon', '?date=' + date).identity).toEqual(identity);
-  });
-
-  it('retains a pinned v1 Catdog daily and its progress key after the v2 cutover', () => {
-    const date = '2026-11-09';
-    const identity = resolve('sunmoon', '?date=' + date + '&v=1').identity!;
-    const seed = '["daily","sunmoon","2026-11-09","standard",1]';
-    expect(identity).toEqual({ gameId: 'sunmoon', mode: 'daily', date, seed, generatorVersion: 1 });
-    expect(puzzleKey(identity)).toBe(JSON.stringify(['sunmoon', 'daily', date, seed, 1]));
-    expect(puzzleKey(identity)).not.toBe(puzzleKey(dailyIdentity('sunmoon', date)));
-  });
-
-  it('honors a pinned supported generator independently of the daily schedule', () => {
-    const date = '2026-11-08';
-    expect(resolve('sunmoon', '?date=' + date + '&v=2').identity).toEqual({
-      gameId: 'sunmoon', mode: 'daily', date, generatorVersion: 2,
-      seed: '["daily","sunmoon","2026-11-08","standard",2]'
-    });
-  });
-
-  it.each([
     ['2026-11-08T05:59:59Z', '2026-11-07'],
     ['2026-11-08T06:00:00Z', '2026-11-08'],
     ['2026-11-09T05:59:59Z', '2026-11-08'],
@@ -81,38 +53,32 @@ describe('Chicago daily identity', () => {
   ])('selects the daily at Chicago instant %s', (instant, date) => {
     const now = new Date(instant);
     for (const gameId of ['kings', 'fivefold', 'sunmoon']) {
-      const version = gameId === 'sunmoon' && date >= '2026-11-09' ? 2 : 1;
       expect(resolve(gameId, '', now).identity).toEqual(dailyIdentity(gameId, date));
-      expect(resolve(gameId, '?v=' + version, now).identity).toEqual(dailyIdentity(gameId, date));
+      expect(resolve(gameId, '?v=1', now).identity).toEqual(dailyIdentity(gameId, date));
     }
   });
 
-  it('uses the latest supported generator for arbitrary seeds', () => {
+  it('uses v1 for arbitrary seeds', () => {
     for (const gameId of ['kings', 'fivefold', 'sunmoon']) {
       for (const seed of ['', 'random-seed', '2026-01-01']) {
         const identity = seedIdentity(gameId, seed);
-        const generatorVersion = gameId === 'sunmoon' ? 2 : 1;
-        expect(identity).toEqual({ gameId, mode: 'seed', seed, generatorVersion });
+        expect(identity).toEqual({ gameId, mode: 'seed', seed, generatorVersion: 1 });
         expect(resolve(gameId, '?' + new URLSearchParams({ seed })).identity).toEqual(identity);
       }
     }
   });
 
-  it.each(['', 'a+b & café 🌱', ' e\u0301 '])('keeps both exact Catdog seed namespaces isolated for %j', (seed) => {
-    const legacy = resolve('sunmoon', '?' + new URLSearchParams({ seed, v: '1' })).identity;
-    const current = resolve('sunmoon', '?' + new URLSearchParams({ seed, v: '2' })).identity;
-    expect(legacy).toEqual({ gameId: 'sunmoon', mode: 'seed', seed, generatorVersion: 1 });
-    expect(current).toEqual({ gameId: 'sunmoon', mode: 'seed', seed, generatorVersion: 2 });
-    expect(puzzleKey(legacy!)).not.toBe(puzzleKey(current!));
+  it.each(['', 'a+b & café 🌱', ' e\u0301 '])('preserves the exact Catdog seed %j', (seed) => {
+    const identity = resolve('sunmoon', '?' + new URLSearchParams({ seed, v: '1' })).identity;
+    expect(identity).toEqual({ gameId: 'sunmoon', mode: 'seed', seed, generatorVersion: 1 });
   });
 
-  it('roundtrips daily and Unicode/empty seed links with the supported version', () => {
+  it('roundtrips daily and Unicode/empty seed links with v1', () => {
     for (const gameId of ['kings', 'fivefold', 'sunmoon']) {
-      const versions = gameId === 'sunmoon' ? [1, 2] as const : [1] as const;
-      const identities = versions.flatMap((version) => [
-        ...['', 'a+b & café 🌱', '2026-01-01'].map((seed) => seedIdentity(gameId, seed, version)),
-        ...['2026-01-01', '2026-11-08', '2027-01-01'].map((date) => dailyIdentity(gameId, date, version))
-      ]);
+      const identities = [
+        ...['', 'a+b & café 🌱', ' e\u0301 ', '2026-01-01'].map((seed) => seedIdentity(gameId, seed)),
+        ...['2026-01-01', '2026-11-08', '2027-01-01'].map((date) => dailyIdentity(gameId, date))
+      ];
       for (const first of identities) {
         const url = new URL(puzzleUrl(first, origin));
         expect(url.pathname).toBe(gameId === 'sunmoon' ? '/games/catdog/' : '/games/' + gameId + '/');
@@ -146,16 +112,11 @@ describe('Chicago daily identity', () => {
 
   it.each(['', 'seed=a&', 'date=2026-11-08&', 'date=2027-01-01&'])('rejects unavailable versions in %s', (query) => {
     for (const gameId of ['fivefold', 'kings', 'sunmoon']) {
-      const result = resolve(gameId, '?' + query + 'v=3');
-      expect(result.identity).toBeNull();
-      expect(result.error).not.toBeNull();
+      for (const version of [2, 3]) {
+        const result = resolve(gameId, '?' + query + 'v=' + version);
+        expect(result.identity).toBeNull();
+        expect(result.error).not.toBeNull();
+      }
     }
-  });
-
-  it.each(['fivefold', 'kings'])('does not enable Catdog v2 for %s', (gameId) => {
-    expect(resolve(gameId, '?v=2').identity).toBeNull();
-    expect(resolve(gameId, '?seed=shared&v=2').identity).toBeNull();
-    expect(() => dailyIdentity(gameId, '2026-11-09', 2)).toThrow(RangeError);
-    expect(() => seedIdentity(gameId, 'shared', 2)).toThrow(RangeError);
   });
 });

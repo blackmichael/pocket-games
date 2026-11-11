@@ -68,7 +68,7 @@
     if (failure) warning = failure;
   }
   onMount(() => {
-    puzzle = generate(identity.seed, identity.generatorVersion);
+    puzzle = generate(identity.seed);
     const restored = loadSave(key, (value) => parseSavedGame(value, puzzle!));
     board = restored.value?.board ?? [...puzzle.givens];
     warning = restored.warning;

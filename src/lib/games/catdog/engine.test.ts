@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chooseHintCell, conflictingCells, generate, isSolved, parseSavedGame, SAVE_VERSION, SIZE, type Cell, type Clue, type Puzzle } from './engine';
+import { chooseHintCell, conflictingCells, difficulty, generate, isSolved, MAX_DIFFICULTY, parseSavedGame, SAVE_VERSION, SIZE, type Cell, type Clue, type Puzzle } from './engine';
 
 const CELLS = SIZE * SIZE;
 const blank = (): Cell[] => Array<Cell>(CELLS).fill(0);
@@ -7,17 +7,15 @@ const cells = (text: string): Cell[] => [...text].map((value) => Number(value) a
 const legal = cells('112122221211112122221211112122221211');
 const unrestricted = (): Puzzle => ({ givens: blank(), clues: [], solution: [...legal] });
 
-const v1Vectors = [
+const vectors = [
   {
     seed: '',
-    givens: '000002000000000000000000000000002100',
+    givens: '000002002000000000000000000100002100',
     solution: '121212212211122121211212221121112122',
     clues: [
-      { a: 22, b: 23, same: false }, { a: 5, b: 11, same: false },
-      { a: 34, b: 35, same: true }, { a: 16, b: 22, same: false },
-      { a: 14, b: 15, same: false }, { a: 7, b: 13, same: false },
-      { a: 13, b: 19, same: false }, { a: 27, b: 33, same: true },
-      { a: 22, b: 28, same: false }, { a: 8, b: 14, same: true },
+      { a: 22, b: 23, same: false }, { a: 34, b: 35, same: true },
+      { a: 16, b: 22, same: false }, { a: 14, b: 15, same: false },
+      { a: 7, b: 13, same: false }, { a: 13, b: 19, same: false },
     ],
   },
   {
@@ -28,71 +26,16 @@ const v1Vectors = [
       { a: 23, b: 29, same: false }, { a: 8, b: 14, same: false },
       { a: 13, b: 14, same: true }, { a: 21, b: 22, same: true },
       { a: 18, b: 24, same: true }, { a: 22, b: 23, same: false },
-      { a: 4, b: 5, same: false }, { a: 27, b: 28, same: true },
     ],
   },
   {
     seed: '日月☀️🌙',
-    givens: '000001000001002000000010000000000000',
+    givens: '010001000001000000001010000000200000',
     solution: '211221122121112212221211121122212112',
     clues: [
       { a: 25, b: 31, same: false }, { a: 6, b: 7, same: false },
       { a: 2, b: 3, same: false }, { a: 17, b: 23, same: false },
-      { a: 10, b: 11, same: false }, { a: 14, b: 20, same: false },
-      { a: 1, b: 2, same: true }, { a: 24, b: 30, same: false },
     ],
-  },
-];
-
-const v2Vectors = [
-  {
-    seed: '',
-    givens: '100000100010000010000000000001000000',
-    solution: '122121121212212112122121211221211212',
-    clues: [
-      { a: 13, b: 19, same: false }, { a: 14, b: 15, same: false },
-      { a: 7, b: 8, same: false }, { a: 12, b: 18, same: false },
-      { a: 9, b: 15, same: false }, { a: 27, b: 33, same: true },
-      { a: 26, b: 32, same: true }, { a: 19, b: 20, same: true },
-    ],
-  },
-  {
-    seed: 'fixed-seed',
-    givens: '000001000000000020000002000000000000',
-    solution: '212121221211112122211212121221122112',
-    clues: [
-      { a: 25, b: 31, same: true }, { a: 6, b: 12, same: false },
-      { a: 21, b: 27, same: true }, { a: 1, b: 7, same: false },
-      { a: 30, b: 31, same: false }, { a: 19, b: 20, same: true },
-      { a: 0, b: 6, same: true }, { a: 8, b: 9, same: false },
-    ],
-  },
-  {
-    seed: '日月☀️🌙',
-    givens: '000202000000010200000002000001000000',
-    solution: '121212122121212211121122212121211212',
-    clues: [
-      { a: 8, b: 9, same: false }, { a: 26, b: 32, same: false },
-      { a: 24, b: 25, same: false }, { a: 0, b: 6, same: true },
-      { a: 31, b: 32, same: true }, { a: 20, b: 26, same: false },
-    ],
-  },
-  {
-    seed: '\ud800',
-    givens: '010000000000000000000020000020200200',
-    solution: '212121122112211212122121121221211212',
-    clues: [
-      { a: 11, b: 17, same: true }, { a: 10, b: 11, same: false },
-      { a: 4, b: 10, same: false }, { a: 34, b: 35, same: false },
-      { a: 25, b: 26, same: false }, { a: 15, b: 16, same: false },
-      { a: 7, b: 13, same: false },
-    ],
-  },
-  {
-    seed: 'sample-37',
-    givens: '010100000000010202011010000000100010',
-    solution: '212121122121211212211212122121121212',
-    clues: [{ a: 6, b: 7, same: false }, { a: 6, b: 12, same: false }],
   },
 ];
 
@@ -175,21 +118,22 @@ function canonical(puzzle: Puzzle, layout: boolean): string {
   return minimum!;
 }
 
-describe('Catdog generator v1', () => {
-  it.each(v1Vectors)('freezes every puzzle field for seed "$seed"', ({ seed, givens, solution, clues }) => {
-    expect(generate(seed, 1)).toEqual({ givens: cells(givens), solution: cells(solution), clues });
+describe('Catdog generator', () => {
+  it.each(vectors)('freezes every puzzle field for seed "$seed"', ({ seed, givens, solution, clues }) => {
+    expect(generate(seed)).toEqual({ givens: cells(givens), solution: cells(solution), clues });
   });
 
-  it('constructs valid puzzles with exactly one independently enumerated completion', () => {
-    const seeds = [...v1Vectors.map(({ seed }) => seed), ...Array.from({ length: 100 }, (_, index) => `sample-${index}`)];
+  it('constructs valid puzzles with exactly one independently enumerated completion below the difficulty ceiling', () => {
+    const seeds = [...vectors.map(({ seed }) => seed), ...Array.from({ length: 100 }, (_, index) => `sample-${index}`)];
     for (const seed of seeds) {
-      const puzzle = generate(seed, 1);
+      const puzzle = generate(seed);
       expect(puzzle.givens).toHaveLength(CELLS);
       expect(puzzle.solution).toHaveLength(CELLS);
-      expect(puzzle.givens.some((value) => value !== 0)).toBe(true);
-      expect(puzzle.givens.filter((value) => value !== 0).length).toBeLessThan(CELLS / 2);
-      expect(puzzle.clues.length).toBeGreaterThanOrEqual(8);
-      expect(puzzle.clues.length).toBeLessThanOrEqual(12);
+      const givenCount = puzzle.givens.filter((value) => value !== 0).length;
+      expect(givenCount).toBeGreaterThan(0);
+      expect(givenCount).toBeLessThan(CELLS);
+      expect(puzzle.clues.length).toBeLessThanOrEqual(10);
+      expect(difficulty(puzzle)).toBeLessThanOrEqual(MAX_DIFFICULTY);
       const edges = new Set<string>();
       for (const { a, b, same } of puzzle.clues) {
         expect(Number.isInteger(a) && Number.isInteger(b)).toBe(true);
@@ -198,6 +142,8 @@ describe('Catdog generator v1', () => {
         expect(a).toBeLessThan(b);
         expect(b - a === SIZE || (b - a === 1 && Math.floor(a / SIZE) === Math.floor(b / SIZE))).toBe(true);
         expect(typeof same).toBe('boolean');
+        expect(puzzle.givens[a]).toBe(0);
+        expect(puzzle.givens[b]).toBe(0);
         expect(puzzle.solution[a] === puzzle.solution[b]).toBe(same);
         edges.add(`${a}:${b}`);
       }
@@ -218,102 +164,6 @@ describe('Catdog generator v1', () => {
           }
         }
       }
-      expect(conflictingCells(puzzle.givens, puzzle)).toEqual([]);
-      expect(isSolved(puzzle.givens, puzzle)).toBe(false);
-      expect(isSolved(puzzle.solution, puzzle)).toBe(true);
-      expect(completions(puzzle)).toEqual([puzzle.solution]);
-    }
-  });
-
-  it('removes every individually redundant given without changing the relation clues', () => {
-    for (const { seed } of v1Vectors) {
-      const puzzle = generate(seed, 1);
-      for (let cell = 0; cell < CELLS; cell += 1) {
-        if (puzzle.givens[cell] === 0) continue;
-        const givens = [...puzzle.givens];
-        givens[cell] = 0;
-        expect(completions({ ...puzzle, givens })).toHaveLength(2);
-      }
-    }
-  });
-
-  it('is independent of request order and returned data mutations', () => {
-    const seeds = ['', ' ', 'seed', 'seed ', 'Seed', 'é', 'e\u0301', ...v1Vectors.map(({ seed }) => seed)];
-    const expected = seeds.map((seed) => generate(seed, 1));
-    for (let index = seeds.length - 1; index >= 0; index -= 1) {
-      const puzzle = generate(seeds[index], 1);
-      expect(puzzle).toEqual(expected[index]);
-      puzzle.givens.fill(2);
-      puzzle.solution.fill(0);
-      puzzle.clues[0].same = !puzzle.clues[0].same;
-      puzzle.clues.pop();
-      expect(generate(seeds[index], 1)).toEqual(expected[index]);
-    }
-    expect(generate('seed', 1)).not.toEqual(generate('seed ', 1));
-    expect(generate('é', 1)).not.toEqual(generate('e\u0301', 1));
-  });
-
-  it('varies solution and clue geometry beyond symbol swaps, rotations, and reflections', () => {
-    const arrangements = new Set<string>();
-    const solutionGeometry = new Set<string>();
-    const puzzleGeometry = new Set<string>();
-    const clueCounts = new Set<number>();
-    for (let index = 0; index < 160; index += 1) {
-      const puzzle = generate(`variety-${index}`, 1);
-      arrangements.add(puzzle.solution.join(''));
-      solutionGeometry.add(canonical(puzzle, false));
-      puzzleGeometry.add(canonical(puzzle, true));
-      clueCounts.add(puzzle.clues.length);
-    }
-    expect(arrangements.size).toBeGreaterThan(120);
-    expect(solutionGeometry.size).toBeGreaterThan(60);
-    expect(puzzleGeometry.size).toBeGreaterThan(140);
-    expect(clueCounts.size).toBe(5);
-  });
-});
-
-describe('Catdog generator v2', () => {
-  it.each(v2Vectors)('freezes every puzzle field for seed "$seed" and defaults to v2', ({ seed, givens, solution, clues }) => {
-    const expected = { givens: cells(givens), solution: cells(solution), clues };
-    expect(generate(seed, 2)).toEqual(expected);
-    expect(generate(seed)).toEqual(expected);
-    expect(generate(seed, 1)).not.toEqual(expected);
-  });
-
-  it.each([null, 0, 3, -1, 1.5, NaN, Infinity, '1', '2', false])('rejects unsupported runtime version %s', (version) => {
-    expect(() => generate('version', version as 1 | 2)).toThrow(RangeError);
-  });
-
-  it('keeps a unique independently enumerated completion with no relation touching a given', () => {
-    const seeds = [...v2Vectors.map(({ seed }) => seed), ...Array.from({ length: 100 }, (_, index) => `sample-${index}`)];
-    for (const seed of seeds) {
-      const puzzle = generate(seed, 2);
-      expect(puzzle.givens).toHaveLength(CELLS);
-      expect(puzzle.solution).toHaveLength(CELLS);
-      const givenCount = puzzle.givens.filter((value) => value !== 0).length;
-      expect(givenCount).toBeGreaterThan(0);
-      expect(givenCount).toBeLessThan(CELLS);
-      expect(puzzle.clues.length).toBeLessThanOrEqual(12);
-      const edges = new Set<string>();
-      for (const { a, b, same } of puzzle.clues) {
-        expect(Number.isInteger(a) && Number.isInteger(b)).toBe(true);
-        expect(a).toBeGreaterThanOrEqual(0);
-        expect(b).toBeLessThan(CELLS);
-        expect(a).toBeLessThan(b);
-        expect(b - a === SIZE || (b - a === 1 && Math.floor(a / SIZE) === Math.floor(b / SIZE))).toBe(true);
-        expect(typeof same).toBe('boolean');
-        expect(puzzle.givens[a]).toBe(0);
-        expect(puzzle.givens[b]).toBe(0);
-        expect(puzzle.solution[a] === puzzle.solution[b]).toBe(same);
-        edges.add(`${a}:${b}`);
-      }
-      expect(edges.size).toBe(puzzle.clues.length);
-      for (let cell = 0; cell < CELLS; cell += 1) {
-        expect([0, 1, 2]).toContain(puzzle.givens[cell]);
-        expect([1, 2]).toContain(puzzle.solution[cell]);
-        if (puzzle.givens[cell] !== 0) expect(puzzle.givens[cell]).toBe(puzzle.solution[cell]);
-      }
-      // This solver checks balance, triples, givens and relations independently.
       expect(completions(puzzle)).toEqual([puzzle.solution]);
       expect(conflictingCells(puzzle.givens, puzzle)).toEqual([]);
       expect(isSolved(puzzle.givens, puzzle)).toBe(false);
@@ -321,24 +171,12 @@ describe('Catdog generator v2', () => {
     }
   });
 
-  it('minimizes the propagated givens against only the surviving relations', () => {
-    for (const { seed } of v2Vectors) {
-      const puzzle = generate(seed, 2);
-      for (let cell = 0; cell < CELLS; cell += 1) {
-        if (puzzle.givens[cell] === 0) continue;
-        const givens = [...puzzle.givens];
-        givens[cell] = 0;
-        expect(completions({ ...puzzle, givens })).toHaveLength(2);
-      }
-    }
-  });
-
-  it('isolates versions, exact UTF-16 seeds, request order and returned mutations', () => {
-    const seeds = ['', ' ', 'seed', 'seed ', 'Seed', '\0', 'é', 'e\u0301', '\ud800', '\ufffd', ...v2Vectors.map(({ seed }) => seed)];
-    const requests = seeds.flatMap((seed) => ([1, 2] as const).map((version) => ({ seed, version, expected: generate(seed, version) })));
+  it('isolates exact UTF-16 seeds, request order and returned mutations', () => {
+    const seeds = ['', ' ', 'seed', 'seed ', 'Seed', '\0', 'é', 'e\u0301', '\ud800', '\ufffd', ...vectors.map(({ seed }) => seed)];
+    const requests = seeds.map((seed) => ({ seed, expected: generate(seed) }));
     for (let index = requests.length - 1; index >= 0; index -= 1) {
-      const { seed, version, expected } = requests[index];
-      const puzzle = generate(seed, version);
+      const { seed, expected } = requests[index];
+      const puzzle = generate(seed);
       expect(puzzle).toEqual(expected);
       puzzle.givens.fill(2);
       puzzle.solution.fill(0);
@@ -348,12 +186,10 @@ describe('Catdog generator v2', () => {
         clue.same = !clue.same;
       }
       puzzle.clues.length = 0;
-      expect(generate(seed, version)).toEqual(expected);
-      generate(seed, version === 1 ? 2 : 1).solution.fill(0);
-      expect(generate(seed, version)).toEqual(expected);
+      expect(generate(seed)).toEqual(expected);
     }
     for (const [a, b] of [['', ' '], ['', '\0'], ['seed', 'seed '], ['seed', 'Seed'], ['é', 'e\u0301'], ['\ud800', '\ufffd']]) {
-      expect(generate(a, 2)).not.toEqual(generate(b, 2));
+      expect(generate(a)).not.toEqual(generate(b));
     }
   });
 
@@ -364,7 +200,7 @@ describe('Catdog generator v2', () => {
     const clueCounts = new Set<number>();
     const givenCounts = new Set<number>();
     for (let index = 0; index < 160; index += 1) {
-      const puzzle = generate(`variety-${index}`, 2);
+      const puzzle = generate(`variety-${index}`);
       arrangements.add(puzzle.solution.join(''));
       solutionGeometry.add(canonical(puzzle, false));
       puzzleGeometry.add(canonical(puzzle, true));
@@ -378,23 +214,89 @@ describe('Catdog generator v2', () => {
     expect(givenCounts.size).toBeGreaterThan(3);
   });
 
-  it('plays and resumes propagated boards through the unchanged save format', () => {
-    for (const { seed } of v2Vectors) {
-      const puzzle = generate(seed, 2);
+  it('plays and resumes generated boards through save format 2', () => {
+    for (const { seed } of vectors) {
+      const puzzle = generate(seed);
       const board = [...puzzle.givens];
-      expect(SAVE_VERSION).toBe(1);
       for (let cell = 0; cell < CELLS; cell += 1) {
         if (puzzle.givens[cell] !== 0) continue;
         expect(isSolved(board, puzzle)).toBe(false);
         board[cell] = puzzle.solution[cell];
         expect(conflictingCells(board, puzzle)).toEqual([]);
-        expect(parseSavedGame({ version: 1, board, elapsedMs: cell }, puzzle)?.board).toEqual(board);
+        expect(parseSavedGame({ version: 2, board, elapsedMs: cell }, puzzle)?.board).toEqual(board);
       }
       expect(isSolved(board, puzzle)).toBe(true);
+      expect(parseSavedGame({ version: 1, board, elapsedMs: 100 }, puzzle)).toBeNull();
       const fixed = puzzle.givens.findIndex((value) => value !== 0);
       board[fixed] = 0;
-      expect(parseSavedGame({ version: 1, board, elapsedMs: 100 }, puzzle)).toBeNull();
+      expect(parseSavedGame({ version: 2, board, elapsedMs: 100 }, puzzle)).toBeNull();
     }
+  });
+});
+
+describe('Catdog difficulty', () => {
+  it('counts unresolved cells without guessing from unanchored relations', () => {
+    expect(difficulty({ givens: blank(), clues: [] })).toBe(CELLS);
+    expect(difficulty({ givens: blank(), clues: [{ a: 0, b: 1, same: true }] })).toBe(CELLS);
+    expect(difficulty({ givens: [...legal], clues: [] })).toBe(0);
+  });
+
+  it.each(['row', 'column'])('fills forced legal %s patterns before counting', (direction) => {
+    const givens = blank();
+    for (let offset = 0; offset < SIZE - 1; offset += 1) {
+      givens[direction === 'row' ? offset : offset * SIZE] = legal[offset];
+    }
+    expect(difficulty({ givens, clues: [] })).toBe(CELLS - SIZE);
+  });
+
+  it('repeats known-relation propagation and row consensus to a fixed point', () => {
+    const givens = blank();
+    givens[0] = 1;
+    const clues = [
+      { a: 2, b: 3, same: true },
+      { a: 1, b: 2, same: false },
+      { a: 0, b: 1, same: false },
+    ];
+    expect(difficulty({ givens, clues })).toBe(CELLS - SIZE);
+    expect(difficulty({ givens, clues: [] })).toBe(CELLS - 1);
+  });
+
+  it('does not read the stored solution or mutate givens and relations', () => {
+    const puzzle: Puzzle = {
+      givens: blank(),
+      clues: [{ a: 0, b: 1, same: false }],
+      get solution(): Cell[] { throw new Error('Difficulty must not consult the answer'); },
+    };
+    puzzle.givens[0] = 1;
+    Object.freeze(puzzle.givens);
+    Object.freeze(puzzle.clues[0]);
+    Object.freeze(puzzle.clues);
+    expect(difficulty(puzzle)).toBe(CELLS - 2);
+    expect(puzzle.givens[1]).toBe(0);
+  });
+
+  it('adds givens to an over-ceiling board without rerolling its solution', () => {
+    const original: Puzzle = {
+      givens: cells('100000000020000000010000000000000000'),
+      solution: cells('112212121221221121212112112212221121'),
+      clues: [
+        { a: 21, b: 22, same: true }, { a: 33, b: 34, same: false },
+        { a: 14, b: 20, same: false }, { a: 32, b: 33, same: true },
+        { a: 6, b: 7, same: false }, { a: 15, b: 21, same: true },
+        { a: 3, b: 4, same: false }, { a: 16, b: 17, same: false },
+      ],
+    };
+    expect(difficulty(original)).toBe(32);
+    expect(difficulty(original)).toBeGreaterThan(MAX_DIFFICULTY);
+    expect(completions(original)).toEqual([original.solution]);
+    const adjusted = generate('ceiling-regression-0');
+    expect(adjusted.solution).toEqual(original.solution);
+    for (let cell = 0; cell < CELLS; cell += 1) {
+      if (original.givens[cell] !== 0) expect(adjusted.givens[cell]).toBe(original.givens[cell]);
+    }
+    expect(adjusted.givens.filter((value) => value !== 0).length).toBeGreaterThan(original.givens.filter((value) => value !== 0).length);
+    expect(difficulty(adjusted)).toBeLessThanOrEqual(MAX_DIFFICULTY);
+    expect(completions(adjusted)).toEqual([original.solution]);
   });
 });
 
@@ -541,7 +443,7 @@ describe('Catdog completion', () => {
   });
 
   it('does not mutate inputs while reporting conflicts and completion', () => {
-    const puzzle = generate('immutable-rules', 1);
+    const puzzle = generate('immutable-rules');
     const before = JSON.stringify(puzzle);
     const board = Object.freeze([...puzzle.solution]);
     expect(conflictingCells(board, puzzle)).toEqual([]);
@@ -562,6 +464,13 @@ describe('Catdog save validation', () => {
     expect(conflictingCells(conflict, puzzle).length).toBeGreaterThan(0);
     expect(parseSavedGame(save(conflict, 0), puzzle)).toEqual(save(conflict, 0));
     expect(parseSavedGame(save([...legal]), puzzle)).toEqual(save([...legal]));
+  });
+
+  it('rejects format 1 even when its board matches the current generated givens', () => {
+    const generated = generate('save-format-rejection');
+    const draft = { version: 2, board: [...generated.givens], elapsedMs: 0 };
+    expect(parseSavedGame(draft, generated)).toEqual(draft);
+    expect(parseSavedGame({ ...draft, version: 1 }, generated)).toBeNull();
   });
 
   it('restores violated relation clues as editable drafts', () => {
@@ -588,7 +497,7 @@ describe('Catdog save validation', () => {
   });
 
   it('requires the exact save version and all fields', () => {
-    for (const version of [undefined, null, 0, 2, '1']) {
+    for (const version of [undefined, null, 0, 1, 3, '2']) {
       expect(parseSavedGame({ ...save(), version }, puzzle)).toBeNull();
     }
     expect(parseSavedGame({ version: SAVE_VERSION, board: [...puzzle.givens] }, puzzle)).toBeNull();
@@ -612,7 +521,7 @@ describe('Catdog save validation', () => {
       board[35] = value;
       expect(parseSavedGame(save(board), puzzle)).toBeNull();
     }
-    const generated = generate('save-givens', 1);
+    const generated = generate('save-givens');
     const board = [...generated.givens];
     const cell = board.findIndex((value) => value !== 0);
     board[cell] = 0;

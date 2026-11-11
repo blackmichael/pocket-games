@@ -1,5 +1,6 @@
 export const SIZE = 6;
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
+export const MAX_DIFFICULTY = 30;
 
 export type Cell = 0 | 1 | 2;
 
@@ -16,7 +17,7 @@ export interface Puzzle {
 }
 
 export interface SavedGame {
-  version: 1;
+  version: 2;
   board: Cell[];
   elapsedMs: number;
 }
@@ -134,33 +135,81 @@ function makeSolver(clues: readonly Clue[], order: Uint8Array = NATURAL_ORDER) {
     return count;
   };
 }
+/**
+ * Cells left after forced line-pattern deductions and relation propagation.
+ * A solvable puzzle scores 0–36; no guessing or solution lookup is used.
+ */
+export function difficulty(puzzle: Pick<Puzzle, 'givens' | 'clues'>): number {
+  const board = Uint8Array.from(puzzle.givens);
+  const same = new Uint8Array(SIZE * 2);
+  const different = new Uint8Array(SIZE * 2);
+  for (const clue of puzzle.clues) {
+    const horizontal = clue.b - clue.a === 1;
+    const line = horizontal ? Math.floor(clue.a / SIZE) : SIZE + clue.a % SIZE;
+    const offset = horizontal ? clue.a % SIZE : Math.floor(clue.a / SIZE);
+    (clue.same ? same : different)[line] |= 1 << offset;
+  }
+  let unresolved = 0;
+  for (const value of board) if (value === 0) unresolved += 1;
+  let changed: boolean;
+  do {
+    changed = false;
+    for (const { a, b, same } of puzzle.clues) {
+      if ((board[a] === 0) === (board[b] === 0)) continue;
+      const fixed = board[a] === 0 ? b : a;
+      const other = fixed === a ? b : a;
+      board[other] = same ? board[fixed] : 3 - board[fixed];
+      unresolved -= 1;
+      changed = true;
+    }
+    for (let line = 0; line < SIZE * 2; line += 1) {
+      const start = line < SIZE ? line * SIZE : line - SIZE;
+      const step = line < SIZE ? 1 : SIZE;
+      let fixedSuns = 0;
+      let fixedMoons = 0;
+      for (let offset = 0; offset < SIZE; offset += 1) {
+        const value = board[start + offset * step];
+        if (value === 1) fixedSuns |= 1 << offset;
+        if (value === 2) fixedMoons |= 1 << offset;
+      }
+      let everySun = FULL_ROW;
+      let anySun = 0;
+      for (const mask of ROW_PATTERNS) {
+        if ((mask & fixedSuns) !== fixedSuns || (mask & fixedMoons) !== 0) continue;
+        const changes = mask ^ (mask >>> 1);
+        if ((changes & same[line]) !== 0 || (changes & different[line]) !== different[line]) continue;
+        everySun &= mask;
+        anySun |= mask;
+      }
+      for (let offset = 0; offset < SIZE; offset += 1) {
+        const cell = start + offset * step;
+        if (board[cell] !== 0) continue;
+        const bit = 1 << offset;
+        if ((everySun & bit) !== 0) board[cell] = 1;
+        else if ((anySun & bit) === 0) board[cell] = 2;
+        else continue;
+        unresolved -= 1;
+        changed = true;
+      }
+    }
+  } while (changed);
+  return unresolved;
+}
 
 /**
- * Frozen construction shared by v1 and v2: FNV-1a over little-endian UTF-16
- * code units of the exact seed plus "\0sunmoon-v1" or "\0sunmoon-v2", then
- * Mulberry32 unsigned draws. Modulo Fisher–Yates shuffles consume a draw per
- * swap, including self-swaps. Shuffle the ascending legal row masks separately
- * for rows 0–5; depth-first column-checked search selects the first legal
- * solution. Next shuffle all right/down edges, listed in row-major order
- * (right before down), then draw the clue count (8–12). Shuffle cell indices,
- * add matching givens in that order until count-to-two proves uniqueness, and
- * attempt each removal in reverse addition order. V1 ends here, preserving its
- * exact mapping and relation order.
- *
- * V2 then scans relations in their existing order, replacing each relation
- * touching a given with the equivalent given at its other endpoint and removing
- * that relation. Survivors retain their order; repeat forward passes until no
- * relation touches a given, including relations visited before a newly fixed
- * endpoint. Each replacement preserves the entire completion set. Finally,
- * attempt removal of all nonzero givens in reverse shuffled-cell order against
- * the remaining relations. This cannot introduce a relation touching a given.
- * Propagation/minimization consume no random draws. All searches use fixed
- * traversal bounds, never timeouts or fallback puzzles. Changing any of these
- * orders/algorithms requires a new generator version.
+ * FNV-1a over little-endian UTF-16 code units of the exact seed plus
+ * "\0sunmoon-v1", then Mulberry32 unsigned draws. Modulo Fisher–Yates
+ * shuffles consume a draw per swap, including self-swaps. Shuffle ascending
+ * legal row masks separately for rows 0–5; depth-first column-checked search
+ * selects the first legal solution. Shuffle right/down edges in row-major
+ * order (right before down), then draw the clue count (6–10). Shuffle cells,
+ * add givens until unique, and attempt removals in reverse addition order.
+ * Replace relations touching givens with equivalent fixed pets until stable,
+ * then minimize givens in reverse shuffled-cell order. No time budgets,
+ * external data, or fallback puzzles.
  */
-export function generate(seed: string, version: 1 | 2 = 2): Puzzle {
-  if (version !== 1 && version !== 2) throw new RangeError('Unsupported Catdog generator version');
-  let state = hash(seed + (version === 1 ? '\u0000sunmoon-v1' : '\u0000sunmoon-v2'));
+export function generate(seed: string): Puzzle {
+  let state = hash(seed + '\u0000sunmoon-v1');
   function random(): number {
     state = (state + 0x6d2b79f5) >>> 0;
     let value = Math.imul(state ^ (state >>> 15), state | 1);
@@ -189,7 +238,7 @@ export function generate(seed: string, version: 1 | 2 = 2): Puzzle {
     if (cell < CELLS - SIZE) edges.push(cell * CELLS + cell + SIZE);
   }
   shuffle(edges);
-  const clueCount = 8 + random() % 5;
+  const clueCount = 6 + random() % 5;
   const clues = edges.slice(0, clueCount).map((edge): Clue => {
     const a = Math.floor(edge / CELLS);
     const b = edge % CELLS;
@@ -209,7 +258,7 @@ export function generate(seed: string, version: 1 | 2 = 2): Puzzle {
     givens[cell] = 0;
     if (count(givens, 2) !== 1) givens[cell] = solution[cell];
   }
-  if (version === 2) {
+  function propagateGivens(): void {
     let removed: boolean;
     do {
       let kept = 0;
@@ -227,15 +276,37 @@ export function generate(seed: string, version: 1 | 2 = 2): Puzzle {
       }
       clues.length = kept;
     } while (removed);
-    const remainingCount = makeSolver(clues);
-    for (let index = cells.length - 1; index >= 0; index -= 1) {
-      const cell = cells[index];
-      if (givens[cell] === 0) continue;
-      givens[cell] = 0;
-      if (remainingCount(givens, 2) !== 1) givens[cell] = solution[cell];
-    }
   }
-  return { givens, clues, solution };
+  propagateGivens();
+  const remainingCount = makeSolver(clues);
+  for (let index = cells.length - 1; index >= 0; index -= 1) {
+    const cell = cells[index];
+    if (givens[cell] === 0) continue;
+    givens[cell] = 0;
+    if (remainingCount(givens, 2) !== 1) givens[cell] = solution[cell];
+  }
+  const puzzle = { givens, clues, solution };
+  let score = difficulty(puzzle);
+  while (score > MAX_DIFFICULTY) {
+    let bestCell = -1;
+    let bestScore = score;
+    for (const cell of cells) {
+      if (givens[cell] !== 0) continue;
+      givens[cell] = solution[cell];
+      const candidateScore = difficulty(puzzle);
+      givens[cell] = 0;
+      if (candidateScore < bestScore) {
+        bestCell = cell;
+        bestScore = candidateScore;
+      }
+      if (bestScore === 0) break;
+    }
+    // At least one unresolved cell improves the score; each pass adds a given.
+    givens[bestCell] = solution[bestCell];
+    propagateGivens();
+    score = difficulty(puzzle);
+  }
+  return puzzle;
 }
 
 /** Every participant in a broken rule, in ascending cell order. */
