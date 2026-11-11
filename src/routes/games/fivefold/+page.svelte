@@ -114,10 +114,4 @@
     .game-heading { margin-bottom: 20px; }
     .puzzle-meta { font-size: .72rem; }
   }
-  @media (max-width: 500px) and (max-height: 740px) {
-    main { margin-top: 14px; padding-top: 12px; }
-    .game-heading { margin-bottom: 12px; }
-    h1 { font-size: 1.6rem; margin-bottom: 4px; }
-    .puzzle-meta { margin-bottom: 12px; }
-  }
 </style>

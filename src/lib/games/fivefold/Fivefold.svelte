@@ -417,11 +417,6 @@
     .game-status { min-height: 2.8rem; padding-block: .45rem; }
     .key { height: 46px; }
   }
-  @media (max-width: 500px) and (max-height: 740px) {
-    .board { width: min(100%, 200px); }
-    .game-meta { padding-bottom: .4rem; }
-    .game-status { min-height: 2.2rem; }
-  }
 
   @media (max-width: 380px) {
     .game-meta { font-size: 0.76rem; }

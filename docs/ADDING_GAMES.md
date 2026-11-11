@@ -30,6 +30,8 @@ Match the shared single-card layout used by Fivefold and Kings: do not add a sec
 
 Pocket Games is mobile-web-first. Start the layout at 320–430px wide, including short portrait viewports, then enhance it for desktop. Primary navigation and actions need 44px-high touch targets; dense game keyboards need clear key separation and readable labels. Text inputs and copy textareas use at least 16px type to avoid iOS focus zoom. Do not require hover or landscape, block browser zoom, or hide controls beneath fixed overlays. Keep the board and controls together where practical and allow vertical scrolling on very short screens.
 
+Keep board dimensions and playing-area spacing width-based, not dependent on viewport-height breakpoints. Mobile browser toolbars can change the viewport height while scrolling; switching board sizes or header spacing at those thresholds makes the page jump. Short screens should scroll without changing the active board's geometry.
+
 ### Interaction lifecycle lessons
 - Keep a start gate local to the board and render a seed-independent decorative preview until Start/Resume. A translucent layer over the actual regions still leaks the puzzle. This is a UX gate, not a security boundary.
 - Define timer policy explicitly. For Kings-style gated puzzles, persist accumulated active duration, start only on Start/Resume, freeze on completion, and exclude gate waiting and closed-page time. Use monotonic timing during a session rather than wall-clock deltas across reloads.
