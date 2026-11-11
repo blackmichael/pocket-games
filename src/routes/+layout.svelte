@@ -37,6 +37,8 @@
   .footer-links a { text-decoration: none; }
   .footer-links a:hover, .footer-links a:focus-visible { text-decoration: underline; }
   .footer-attribution { margin: 0; color: var(--muted); font-weight: 500; }
+  .footer-attribution a { position: relative; text-decoration: none; }
+  .footer-attribution a::after { content: ''; position: absolute; left: 0; right: 0; top: calc(50% + .5em + 3px); height: 1px; background: currentColor; transform: scaleY(.5); transform-origin: top; }
   .site-footer a { display: inline-flex; align-items: center; min-height: 44px; color: var(--muted); }
   @media (max-width: 500px) { .site-header { margin-top: 14px; padding-bottom: 10px; } }
 </style>
