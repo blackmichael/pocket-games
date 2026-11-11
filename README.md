@@ -4,6 +4,8 @@ A mobile-web-first, static, local-first daily puzzle site. **Fivefold** is a fiv
 
 Phone layouts and touch interaction are the primary design target; desktop keyboard play remains supported. The Pocket Games rename preserves existing puzzle URLs, seed mappings, and local browser save keys.
 
+The shared footer links to word-list and font credits, the [source code](https://github.com/blackmichael/pocket-games), and the author's site at [michaelblack.xyz](https://michaelblack.xyz).
+
 ## Run
 
 Requires npm and Node 22.17+ on the 22.x line, Node 24.x, or Node 26+. The supported range follows the locked build/test toolchain; Node 23 and 25 are not supported.
