@@ -40,7 +40,9 @@ Pocket Games is mobile-web-first. Start the layout at 320–430px wide, includin
 ## 3. Add the lazy route and catalog entry
 Create src/routes/games/<id>/+page.svelte. Follow the Fivefold route's lifecycle without importing its engine. Dynamically import only your component in the browser. Resolve query parameters with resolvePuzzle(gameId, url), using the platform's Chicago calendar date. Do not invoke generate() in a route load function or preload hook.
 
-Use #lib/platform/PuzzlePicker.svelte in the route header, passing gameId and the current identity (or null while resolving). Its New seed dialog owns custom-seed, date, random, and today navigation; do not duplicate per-game picker forms. Keep game components and engines out of this shared component.
+After successfully resolving a puzzle identity, call `rememberPuzzle(identity, location.origin)` from `#lib/platform/lastPuzzle.js`. The catalog uses this per-game selection for its card links; bare game URLs still open today's daily, and explicit date/seed links are never overridden. Invalid puzzle links must not replace the remembered selection.
+
+Use #lib/platform/PuzzlePicker.svelte in the route header, passing gameId and the current identity (or null while resolving). Its New seed dialog owns custom-seed, date, random, and today navigation; do not duplicate per-game picker forms. Date changes stay as drafts until editing finishes or Enter confirms. Confirmation closes the dialog immediately, before navigation completes; failure reopens it with the selection preserved and an error. Keep game components and engines out of this shared component.
 
 Keep a selected board's identity fixed across midnight. Recheck the Chicago date on focus, visibility return, and a coarse interval; offer the new daily rather than replacing an active game. No daily rebuild or scheduling is needed.
 
@@ -56,7 +58,7 @@ Catalog card backgrounds automatically cycle through the gameCardColors array in
 
 Wrap each catalog card in one native link named by its game heading and described by its summary. The preview, metadata, and card padding must all navigate to the same game. Use a visible full-card keyboard focus outline, keep one tab stop per card, and do not nest links or buttons inside it.
 
-The home page validates last-played links against the metadata catalog. Preserve its same-origin, registered-route check when adding a game; never trust an arbitrary stored URL or cross-origin navigation.
+The home page reads per-game destinations through `lastPuzzleHref` and falls back to each game's ordinary route when no valid selection exists. Preserve its same-origin, matching registered-route, and pinned-identity checks; never trust an arbitrary stored URL or cross-origin navigation. Keep this shared navigation code metadata-only.
 
 ## 4. Verify the contract
 - Unit-check legal/illegal moves, boundaries, completion, corrupted saves, generator invariants, and fixed seed vectors.

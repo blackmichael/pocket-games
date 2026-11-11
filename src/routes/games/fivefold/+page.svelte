@@ -5,6 +5,7 @@
   import { chicagoDate, dailyIdentity, displayDate, resolvePuzzle } from '#lib/platform/daily.js';
   import { puzzleKey, puzzleUrl, type PuzzleIdentity } from '#lib/platform/types.js';
   import PuzzlePicker from '#lib/platform/PuzzlePicker.svelte';
+  import { rememberPuzzle } from '#lib/platform/lastPuzzle.js';
   import { games } from '#lib/catalog.js';
 
   const game = games.find((game) => game.id === 'fivefold')!;
@@ -25,7 +26,7 @@
     error = resolved.error;
     newDay = false;
     if (resolved.identity) {
-      try { localStorage.setItem('puzzle-room:last-played', puzzleUrl(resolved.identity, location.origin)); } catch { /* Game surface reports save availability. */ }
+      rememberPuzzle(resolved.identity, location.origin);
     }
   });
 

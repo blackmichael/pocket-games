@@ -63,7 +63,7 @@
     timerHandle = undefined;
   }
   function persist() {
-    if (!ready) return;
+    if (!ready || !started) return;
     updateElapsed();
     const failure = saveSave(key, { version: SAVE_VERSION, board, elapsedMs });
     if (failure) warning = failure;
@@ -73,7 +73,7 @@
     const restored = loadSave(key, (value) => parseSavedGame(value, puzzle!));
     board = restored.value?.board ?? [...puzzle.givens];
     warning = restored.warning;
-    resumed = restored.value !== null;
+    resumed = restored.value !== null && (restored.value.elapsedMs > 0 || hasMoves);
     accumulatedMs = restored.value?.elapsedMs ?? 0;
     elapsedMs = accumulatedMs;
     solved = isSolved(board, puzzle);

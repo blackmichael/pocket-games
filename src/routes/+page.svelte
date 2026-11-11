@@ -1,24 +1,17 @@
 <script lang="ts">
   import { games } from '#lib/catalog.js';
   import { onMount } from 'svelte';
-  import { chicagoDate, displayDate, resolvePuzzle } from '#lib/platform/daily.js';
+  import { chicagoDate, displayDate } from '#lib/platform/daily.js';
+  import { lastPuzzleHref } from '#lib/platform/lastPuzzle.js';
   const gameCardColors = ['#AD8BEB', '#F5C542', '#59CDA4', '#F58676', '#6ACAE8', '#EE91C2'] as const;
   let today = $state('');
-  let lastPlayed = $state<string | null>(null);
+  let puzzleLinks = $state<Record<string, string>>({});
   onMount(() => {
     const updateDate = () => { today = chicagoDate(); };
     updateDate();
     const interval = window.setInterval(updateDate, 30_000);
     window.addEventListener('focus', updateDate);
-    try {
-      const raw = localStorage.getItem('puzzle-room:last-played');
-      if (raw) {
-        const url = new URL(raw, location.origin);
-        const game = games.find((game) => game.href === url.pathname || (game.id === 'sunmoon' && url.pathname === '/games/sunmoon/'));
-        if (url.origin === location.origin && game && resolvePuzzle(game.id, url).identity)
-          lastPlayed = game.href + url.search;
-      }
-    } catch { /* Guest play remains available without storage. */ }
+    puzzleLinks = Object.fromEntries(games.map((game) => [game.id, lastPuzzleHref(game.id, location.origin) ?? game.href]));
     return () => { clearInterval(interval); window.removeEventListener('focus', updateDate); };
   });
 </script>
@@ -35,7 +28,7 @@
   <ul class="game-list">
     {#each games as game, index}
       <li style:--card-background={gameCardColors[index % gameCardColors.length]}>
-        <a class="game-card" href={game.href} aria-labelledby="game-title-{game.id}" aria-describedby="game-description-{game.id}">
+        <a class="game-card" href={puzzleLinks[game.id] ?? game.href} aria-labelledby="game-title-{game.id}" aria-describedby="game-description-{game.id}">
           <div class="game-copy">
             <h2 id="game-title-{game.id}">{game.title}</h2>
             <p id="game-description-{game.id}">{game.description}</p>
@@ -50,9 +43,6 @@
     {/each}
   </ul>
 
-  {#if lastPlayed}
-    <p class="resume"><a href={lastPlayed}>Continue last puzzle</a></p>
-  {/if}
 </main>
 
 <style>
@@ -70,8 +60,6 @@
   li p { min-block-size: 2lh; margin: 0; line-height: 1.45; }
   .game-info { grid-area: info; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: .8rem; }
   .game-info span:first-child { padding: 4px 8px; background: #ffffff40; border-radius: 4px; }
-  .resume { margin: 16px 0 0; font-size: .9rem; }
-  .resume a { display: inline-flex; align-items: center; min-height: 44px; }
   @media (max-width: 500px) {
     main { margin-top: 18px; }
     .game-card { grid-template-columns: minmax(0, 1fr) 80px; grid-template-areas: "copy preview" "info info"; }
