@@ -32,6 +32,10 @@ Unexpected page errors offer a full-page reload of the same puzzle URL or a retu
 
 The build directory contains the complete static site. Deploy it to Cloudflare Pages or another static host with npm run build as the build command and build as the output directory. No Functions, runtime server, secrets, database, or daily cron are required. Prerendered directory-style routes use trailing slashes. Serve hashed assets with long-lived immutable caching and HTML with revalidation so new releases can be discovered.
 
+Favicon artwork lives in `static/favicon.svg`. After editing it, run `npm run generate:favicons` and commit the generated assets alongside the SVG. The script produces 16/32px PNG fallbacks, a 16/32/48px ICO, an opaque 180px Apple touch icon, and 192/512px manifest icons. `src/app.html` declares the icons and `static/site.webmanifest`; the manifest does not add offline support or a service worker. The icon background is `#494786`; keep the generator's Apple touch background in sync if that color changes.
+
+Run `npm run generate:opengraph` to regenerate the 1200×630 `static/opengraph.png` and its outlined SVG from the favicon and the installed Lilita One font. `src/app.html` declares the shared Open Graph and Twitter large-image metadata, using the public HTTPS image URL at `https://games.michaelblack.xyz/opengraph.png`. Social apps may cache the image after deployment; the temporary review page is not shipped.
+
 Dependency audit note (2026-11-08): the build toolchain includes deepmerge 4.3.1, affected by the low-severity [GHSA-gcqx-w48m-w2h4](https://github.com/advisories/GHSA-gcqx-w48m-w2h4). No patched release is available. Its current use merges trusted Svelte/Vite configuration, not player input, and it is not part of the static browser application. Recheck when updating dependencies; do not apply the audit's suggested downgrade to obsolete SvelteKit versions.
 
 ## Container deployment

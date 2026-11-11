@@ -14,6 +14,8 @@
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "generate:favicons": "node scripts/generate-favicons.mjs",
+    "generate:opengraph": "node scripts/generate-opengraph.mjs",
     "test": "vitest run"
   },
   "devDependencies": {
@@ -22,6 +24,8 @@
     "@sveltejs/adapter-static": "^4.0.1",
     "@sveltejs/kit": "^3.1.1",
     "@sveltejs/vite-plugin-svelte": "^7.0.0",
+    "fontkit": "^2.0.4",
+    "sharp": "^0.35.5",
     "svelte": "^5.57.3",
     "svelte-check": "^4.7.8",
     "typescript": "^6.0.0",
