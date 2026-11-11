@@ -48,7 +48,7 @@
 <style>
   main { width: min(720px, calc(100% - 40px)); margin: 24px auto 0; }
   .catalog-date { margin: 0; text-align: center; color: var(--muted); font-size: .85rem; }
-  .game-list { display: grid; grid-auto-rows: 1fr; gap: 12px; margin: 16px 0 0; padding: 0; list-style: none; }
+  .game-list { display: grid; grid-auto-rows: 1fr; gap: 12px; margin: 16px 0 0; padding: 0 0 32px; list-style: none; }
   li { min-width: 0; }
   .game-card { display: grid; height: 100%; box-sizing: border-box; grid-template-columns: minmax(0, 1fr) 96px; grid-template-areas: "copy preview" "info preview"; align-items: center; gap: 8px 16px; padding: 16px; border: 1px solid transparent; border-radius: 10px; background: var(--card-background); color: var(--ink); text-decoration: none; }
   .game-card:hover { border-color: #342a4044; }

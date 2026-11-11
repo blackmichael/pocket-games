@@ -31,7 +31,7 @@
   .site-header { width: 100%; margin: 24px 0 0; padding: 0 20px 16px; border-bottom: 1px solid var(--line); display: flex; justify-content: center; }
   .brand { display: inline-flex; align-items: center; min-height: 44px; color: var(--ink); font-family: 'Lilita One', 'Segoe UI', system-ui, sans-serif; font-size: clamp(2rem, 6vw, 3rem); font-weight: 400; line-height: 1.1; letter-spacing: -.02em; text-decoration: none; white-space: nowrap; }
   .site-content { flex: 1 0 auto; display: flow-root; padding-bottom: 32px; background-image: url('../lib/assets/console-pattern.svg?inline'); background-size: 96px auto; background-position: center top; }
-  .site-footer { width: 100%; margin: 0; padding: 8px 0; border-top: 1px solid var(--line); font-size: .75rem; }
+  .site-footer { width: 100%; margin: 0; padding: 0; border-top: 1px solid var(--line); font-size: .75rem; }
   .footer-content { width: min(780px, calc(100% - 40px)); margin-inline: auto; text-align: center; }
   .footer-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 0 24px; }
   .footer-links a { text-decoration: none; }
