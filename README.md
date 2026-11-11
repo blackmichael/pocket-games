@@ -36,6 +36,8 @@ Favicon artwork lives in `static/favicon.svg`. After editing it, run `npm run ge
 
 Run `npm run generate:opengraph` to regenerate the 1200×630 `static/opengraph.png` and its outlined SVG from the favicon and the installed Lilita One font. `src/app.html` declares the shared Open Graph and Twitter large-image metadata, using the public HTTPS image URL at `https://games.michaelblack.xyz/opengraph.png`. Social apps may cache the image after deployment; the temporary review page is not shipped.
 
+Artwork is geometrically centered by its visible bounds, not its background: the favicon's stroked bounds are x=15–49 and y=13–51 in the 64-unit viewBox. The social-image generator uses those horizontal bounds and the actual glyph bounds to center the combined logo/text group, with each part vertically centered. Update the generator's logo bounds if the source silhouette changes; tiny raster sizes can round by half a pixel.
+
 Dependency audit note (2026-11-08): the build toolchain includes deepmerge 4.3.1, affected by the low-severity [GHSA-gcqx-w48m-w2h4](https://github.com/advisories/GHSA-gcqx-w48m-w2h4). No patched release is available. Its current use merges trusted Svelte/Vite configuration, not player input, and it is not part of the static browser application. Recheck when updating dependencies; do not apply the audit's suggested downgrade to obsolete SvelteKit versions.
 
 ## Container deployment
