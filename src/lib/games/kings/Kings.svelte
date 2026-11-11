@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
+  import GameHelp from '#lib/platform/GameHelp.svelte';
   import { loadSave, saveSave } from '#lib/platform/storage.js';
   import { puzzleKey, puzzleUrl, type PuzzleIdentity } from '#lib/platform/types.js';
   import { generate, placementConflicts, isSolved, parseSavedGame, SAVE_VERSION, SIZE } from './engine.js';
@@ -177,6 +178,10 @@
   {#if warning}<p class="notice" role="status">{warning}</p>{/if}
   <div class="game-meta">
     <span>{selected.length} / {SIZE} kings</span>
+  <GameHelp game="Kings">
+    <p>Choose ten squares. Use each row, column, and colored region exactly once. No two kings may share an edge or corner. Tap a placed king to remove it. Conflicting crowns stay on the board, outlined and marked with × until you resolve their placements.</p>
+    <p>Select Start puzzle or Resume puzzle to uncover the board and start the timer. It stops when you solve the puzzle. Your board and elapsed time are saved in this browser; time before starting or with the page closed does not count.</p>
+  </GameHelp>
     <span class="timer"><span>Time</span>
       {#if timeRecorded}<time datetime="PT{Math.floor(elapsedMs / 1000)}S" aria-live="off">{elapsedText}</time>
       {:else}<span aria-label="Time was not recorded">—</span>{/if}
@@ -262,7 +267,6 @@
   {:else}
     <button class="text-link clear-button" type="button" onclick={reset} disabled={!ready || !started || selected.length === 0}>Clear board</button>
   {/if}
-  <details><summary>How to play</summary><p>Choose ten squares. Use each row, column, and colored region exactly once. No two kings may share an edge or corner. Tap a placed king to remove it. Conflicting crowns stay on the board, outlined and marked with × until you resolve their placements.</p><p>Select Start puzzle or Resume puzzle to uncover the board and start the timer. It stops when you solve the puzzle. Your board and elapsed time are saved in this browser; time before starting or with the page closed does not count.</p></details>
   <div class="copy-toast" role="status" aria-live="polite" aria-atomic="true">
     {#if showCopyToast}<span>Result copied.</span>{/if}
   </div>
@@ -270,7 +274,7 @@
 
 <style>
   .kings { --invalid: #a3263d; text-align: center; min-width: 0; }
-  .game-meta { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; font-size: .85rem; font-weight: 650; }
+  .game-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; font-size: .85rem; font-weight: 650; }
   .timer { display: inline-flex; align-items: baseline; gap: 8px; }
   .timer > span:first-child { color: var(--muted); font-weight: 400; }
   time { font-variant-numeric: tabular-nums; min-width: 4ch; text-align: right; }
@@ -324,9 +328,6 @@
   .confetti-piece { position: absolute; top: -12px; left: var(--left); width: 7px; height: 12px; background: var(--color); opacity: 0; animation: confetti-fall 1.4s var(--delay) ease-out both; }
   .confetti-piece:nth-child(3n) { border-radius: 50%; width: 8px; height: 8px; }
   .clear-button { margin-top: 16px; min-height: 44px; padding: .5rem .75rem; font-size: .85rem; }
-  details { text-align: left; border-top: 1px solid var(--line); margin-top: 18px; }
-  summary { min-height: 44px; padding-top: 14px; cursor: pointer; }
-  details p { color: var(--muted); font-size: .85rem; line-height: 1.6; }
   @keyframes coronation { 0% { transform: translateY(12px) scale(.7) rotate(-8deg); } 65% { transform: translateY(-5px) scale(1.1) rotate(4deg); } 100% { transform: none; } }
   @keyframes confetti-fall { 0% { opacity: 0; transform: translate(0, -16px) rotate(0); } 12% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--drift), 390px) rotate(var(--spin)); } }
   @media (prefers-reduced-motion: reduce) {

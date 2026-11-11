@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
+  import GameHelp from '#lib/platform/GameHelp.svelte';
   import { loadSave, saveSave } from '#lib/platform/storage.js';
   import { puzzleKey, puzzleUrl, type PuzzleIdentity } from '#lib/platform/types.js';
   import { generate, conflictingCells, isSolved, chooseHintCell, parseSavedGame, SAVE_VERSION, SIZE, type Cell, type Puzzle } from './engine.js';
@@ -218,10 +219,23 @@
 
 <section class="catdog" aria-label="Catdog game">
   {#if warning}<p class="notice" role="status">{warning}</p>{/if}
-  <div class="game-meta"><span>{started ? `${filled} / 36 filled` : '6 × 6 puzzle'}</span><span class="timer">Time <time datetime="PT{Math.floor(elapsedMs / 1000)}S">{elapsedText}</time></span></div>
+  <div class="game-meta">
+    <span>{started ? `${filled} / 36 filled` : '6 × 6 puzzle'}</span>
+  <GameHelp game="Catdog">
+    <ul>
+      <li>Put three dogs and three cats in every row and column.</li>
+      <li>No three matching pets consecutively across or down.</li>
+      <li>= means matching neighbors; × means different neighbors.</li>
+    </ul>
+    <p>Shaded pets are fixed. Tap other squares to cycle empty → Poppy → Pigeon → empty.</p>
+    <p>Hint reveals a random square and adds 10 seconds.</p>
+    <p>Keyboard: arrows move; Enter/Space cycle; D enters Poppy, C enters Pigeon; Backspace/Delete erase.</p>
+  </GameHelp>
+    <span class="timer">Time <time datetime="PT{Math.floor(elapsedMs / 1000)}S">{elapsedText}</time></span>
+  </div>
   <div class="board-wrap">
     {#if started && puzzle}
-      <div class="board" role="grid" tabindex="-1" aria-label="Catdog puzzle" aria-describedby="catdog-instructions" bind:this={boardElement} onkeydown={handleKey}>
+      <div class="board" role="grid" tabindex="-1" aria-label="Catdog puzzle" bind:this={boardElement} onkeydown={handleKey}>
         {#each Array(SIZE) as _, row}
           <div class="board-row" role="row">
             {#each Array(SIZE) as __, col}
@@ -266,23 +280,12 @@
   {:else}
     <div class="controls"><button class="button secondary" type="button" disabled={!started || !history.length} onclick={undo}>Undo</button><button class="button secondary" type="button" disabled={!ready || !started} onclick={hint}>Hint</button><button class="button secondary clear-button" type="button" disabled={!started || !hasMoves} onclick={clear}><span class:inactive={clearPending} aria-hidden={clearPending}>Clear entries</span><span class:inactive={!clearPending} aria-hidden={!clearPending}>Confirm?</span></button></div>
   {/if}
-  <details id="catdog-instructions">
-    <summary>How to play</summary>
-    <ul>
-      <li>Put three dogs and three cats in every row and column.</li>
-      <li>No three matching pets consecutively across or down.</li>
-      <li>= means matching neighbors; × means different neighbors.</li>
-    </ul>
-    <p>Shaded pets are fixed. Tap other squares to cycle empty → Poppy → Pigeon → empty.</p>
-    <p>Hint reveals a random square and adds 10 seconds.</p>
-    <p>Keyboard: arrows move; Enter/Space cycle; D enters Poppy, C enters Pigeon; Backspace/Delete erase.</p>
-  </details>
   <div class="copy-toast" role="status" aria-live="polite" aria-atomic="true">{#if showCopyToast}<span>Result copied.</span>{/if}</div>
 </section>
 
 <style>
   .catdog { --invalid: #a3263d; min-width: 0; text-align: center; }
-  .game-meta { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 10px; font-size: .85rem; font-weight: 650; }
+  .game-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; font-size: .85rem; font-weight: 650; }
   .timer { display: flex; gap: 8px; color: var(--muted); }
   time { color: var(--ink); font-variant-numeric: tabular-nums; min-width: 4ch; }
   .board-wrap { position: relative; width: min(100%, 396px); aspect-ratio: 1; margin: 0 auto; }
@@ -321,9 +324,6 @@
   .result p { margin: 8px 0; }
   .share-hint { color: var(--muted); font-size: .85rem; }
   textarea { display: block; box-sizing: border-box; width: 100%; margin-top: 8px; font-size: 16px; }
-  details { margin-top: 18px; text-align: left; font-size: .9rem; }
-  summary { cursor: pointer; min-height: 44px; display: list-item; align-content: center; }
-  details p, details li { line-height: 1.55; }
   .copy-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 20; pointer-events: none; }
   .copy-toast span { display: block; border-radius: 10px; padding: 12px 20px; background: var(--ink); color: var(--paper); box-shadow: 0 4px 18px #0002; white-space: nowrap; }
   .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }

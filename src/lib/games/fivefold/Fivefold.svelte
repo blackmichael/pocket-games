@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import GameHelp from '#lib/platform/GameHelp.svelte';
   import { puzzleKey, puzzleUrl, type PuzzleIdentity } from '#lib/platform/types.js';
   import { loadSave, saveSave } from '#lib/platform/storage.js';
   import {
@@ -123,7 +124,7 @@
     const target = event.target;
     if (target instanceof Element) {
       if (target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])') || (target instanceof HTMLElement && target.isContentEditable)) return;
-      // Leave native activation of buttons, links, and the how-to disclosure intact.
+      // Leave native activation of buttons and links intact.
       if (event.key === 'Enter' && target.closest('button, a, summary, [role="button"]')) return;
     }
     if (event.key === 'Enter' || event.key === 'Backspace' || /^[a-zA-Z]$/.test(event.key)) {
@@ -173,6 +174,16 @@
 <section class="fivefold" aria-label="Fivefold game">
   <div class="game-meta">
     <span>{finished ? 'Board complete' : `Guess ${Math.min(guesses.length + 1, MAX_GUESSES)} of ${MAX_GUESSES}`}</span>
+  <GameHelp game="Fivefold">
+      <p>Find the hidden five-letter word in six guesses. Enter a word using your keyboard or the on-screen keys, then press <strong>Enter</strong>. Each guess must be in our word list.</p>
+      <ul>
+        <li><strong>Green — right spot:</strong> that letter is exactly where it belongs.</li>
+        <li><strong>Yellow — wrong spot:</strong> the word contains that letter, but elsewhere.</li>
+        <li><strong>Gray — no match:</strong> there is no remaining copy of that letter to match.</li>
+      </ul>
+      <p>Repeated letters count individually. If you guess two Es and the answer has only one, just one E turns green or yellow. Correct positions are matched first, then remaining copies from left to right.</p>
+      <p>The keyboard keeps each letter’s best clue. Your progress is saved in this browser when storage is available. Sharing reveals the pattern of your guesses, never the word.</p>
+  </GameHelp>
     <span class="letter-count">{WORD_LENGTH} letters</span>
   </div>
 
@@ -254,19 +265,6 @@
     {/each}
   </div>
 
-  <details class="how-to">
-    <summary>How to play Fivefold</summary>
-    <div class="instructions">
-      <p>Find the hidden five-letter word in six guesses. Enter a word using your keyboard or the keys above, then press <strong>Enter</strong>. Each guess must be in our word list.</p>
-      <ul>
-        <li><strong>Green — right spot:</strong> that letter is exactly where it belongs.</li>
-        <li><strong>Yellow — wrong spot:</strong> the word contains that letter, but elsewhere.</li>
-        <li><strong>Gray — no match:</strong> there is no remaining copy of that letter to match.</li>
-      </ul>
-      <p>Repeated letters count individually. If you guess two Es and the answer has only one, just one E turns green or yellow. Correct positions are matched first, then remaining copies from left to right.</p>
-      <p>The keyboard keeps each letter’s best clue. Your progress is saved in this browser when storage is available. Sharing reveals the pattern of your guesses, never the word.</p>
-    </div>
-  </details>
   <noscript><p class="notice">Fivefold needs JavaScript to check guesses and save your board. Enable JavaScript to play.</p></noscript>
 </section>
 
@@ -280,16 +278,16 @@
   }
 
   .game-meta {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
     gap: 0.75rem;
     padding-bottom: 1.2rem;
     font-size: 0.82rem;
     font-weight: normal;
   }
 
-  .letter-count { color: var(--muted); }
+  .letter-count { justify-self: end; color: var(--muted); }
   .storage-warning { margin: 0 0 1.1rem; font-size: 0.85rem; }
   .board { display: grid; gap: 6px; width: min(100%, 326px); margin-inline: auto; }
   .board-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
@@ -372,7 +370,7 @@
   .key:disabled { cursor: default; }
   .keyboard[aria-describedby] .key:disabled:not(.correct):not(.present):not(.absent) { color: #666; background: #f3f3f3; }
   .key:active:not(:disabled) { transform: translateY(1px); border-bottom-width: 1px; }
-  .key:focus-visible, summary:focus-visible, .share-fallback:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+  .key:focus-visible, .share-fallback:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
 
   .result {
     margin: 0 0 1.25rem;
@@ -407,17 +405,9 @@
     resize: vertical;
   }
 
-  .how-to { margin-top: 1.6rem; border-top: 1px solid var(--line); }
-  .how-to summary { width: fit-content; padding: 1rem 0; font-size: 0.85rem; cursor: pointer; }
-  .instructions { padding-bottom: 0.2rem; color: var(--muted); font-size: 0.86rem; line-height: 1.7; }
-  .instructions p { margin: 0 0 0.8rem; }
-  .instructions ul { margin: 0 0 0.8rem; padding-left: 1.25rem; }
-  .instructions li + li { margin-top: 0.2rem; }
-  .instructions strong { color: var(--ink); }
 
   @media (hover: hover) {
     .key:hover:not(:disabled) { filter: brightness(0.95); }
-    .how-to summary:hover { color: var(--accent); }
   }
 
   @media (max-width: 500px) {

@@ -24,6 +24,8 @@ Validate saves against the game's resumable states, not only JSON shape. Kings d
 
 Include clear instructions, accessible state descriptions, non-color-only feedback, visible focus, reduced motion, mobile-friendly controls, and an unambiguous result. Use puzzleUrl(identity, location.origin) for pinned share links. Clipboard failure needs a manual-copy alternative.
 
+Place instructions in `#lib/platform/GameHelp.svelte` within the game's existing status row, passing the game name and instruction content as children. Keep the trigger a quiet text control without a dedicated toolbar or extra vertical space. The rules appear in a labeled native dialog. Keep help available before Start/Resume and after completion; opening help must not change the board or timer policy.
+
 Match the shared single-card layout used by Fivefold and Kings: do not add a second outline around the overall playing area. Keep board grids and region boundaries that communicate game rules.
 
 Pocket Games is mobile-web-first. Start the layout at 320–430px wide, including short portrait viewports, then enhance it for desktop. Primary navigation and actions need 44px-high touch targets; dense game keyboards need clear key separation and readable labels. Text inputs and copy textareas use at least 16px type to avoid iOS focus zoom. Do not require hover or landscape, block browser zoom, or hide controls beneath fixed overlays. Keep the board and controls together where practical and allow vertical scrolling on very short screens.
