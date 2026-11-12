@@ -1,8 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import GameHelp from '#lib/platform/GameHelp.svelte';
+  import ResultDialog from '#lib/platform/ResultDialog.svelte';
   import { puzzleKey, puzzleUrl, type PuzzleIdentity } from '#lib/platform/types.js';
   import { loadSave, saveSave } from '#lib/platform/storage.js';
+  import { shareResult, supportsNativeShare } from '#lib/platform/share.js';
   import {
     generate,
     isAllowedGuess,
@@ -35,6 +37,15 @@
   let shareMessage = $state('');
   let shareFallback = $state(false);
   let sharing = $state(false);
+  let nativeSharing = $state(false);
+  let resultOpen = $state(false);
+  let showCopyToast = $state(false);
+
+  $effect(() => {
+    if (!showCopyToast) return;
+    const timeout = window.setTimeout(() => { showCopyToast = false; }, 4000);
+    return () => window.clearTimeout(timeout);
+  });
 
   const answer = $derived(generate(identity.seed).answer);
   const storageKey = $derived(puzzleKey(identity));
@@ -98,6 +109,7 @@
         return;
       }
       guesses = [...guesses, draft];
+      resultOpen = draft === answer || guesses.length === MAX_GUESSES;
       draft = '';
       message = 'Guess recorded. Try another word.';
       inputError = false;
@@ -140,29 +152,36 @@
       guesses = restored.value.guesses;
       draft = restored.value.draft;
     }
+    nativeSharing = supportsNativeShare();
     ready = true;
     window.addEventListener('keydown', handleKeydown);
-    return () => window.removeEventListener('keydown', handleKeydown);
+    return () => {
+      ready = false;
+      window.removeEventListener('keydown', handleKeydown);
+    };
   });
 
-  async function copyResult() {
+  async function handleShare(event: MouseEvent) {
     if (!ready || !finished || sharing) return;
-    shareText = [
+    (event.currentTarget as HTMLButtonElement).blur();
+    showCopyToast = false;
+    const text = [
       `Fivefold ${won ? guesses.length : 'X'}/${MAX_GUESSES}`,
       identity.mode === 'daily' ? `Daily puzzle · ${identity.date}` : 'Seeded puzzle',
       '',
-      ...scores.map((row) => row.map((state) => shareMarks[state]).join('')),
-      '',
-      puzzleUrl(identity, window.location.origin)
+      ...scores.map((row) => row.map((state) => shareMarks[state]).join(''))
     ].join('\n');
+    const url = puzzleUrl(identity, window.location.origin);
     sharing = true;
     shareMessage = '';
+    shareFallback = false;
     try {
-      if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
-      await navigator.clipboard.writeText(shareText);
-      shareFallback = false;
-      shareMessage = 'Result copied.';
+      const outcome = await shareResult({ title: 'Fivefold — Pocket Games', text, url });
+      if (!ready || outcome === 'cancelled') return;
+      showCopyToast = outcome === 'copied';
     } catch {
+      if (!ready) return;
+      shareText = `${text}\n\n${url}`;
       shareFallback = true;
       shareMessage = 'Clipboard access is unavailable. Select and copy your result below.';
     } finally {
@@ -173,7 +192,11 @@
 
 <section class="fivefold" aria-label="Fivefold game">
   <div class="game-meta">
-    <span>{finished ? 'Board complete' : `Guess ${Math.min(guesses.length + 1, MAX_GUESSES)} of ${MAX_GUESSES}`}</span>
+    {#if ready && finished}
+      <button class="text-link result-trigger" type="button" onclick={() => { resultOpen = true; }} aria-haspopup="dialog" aria-controls="fivefold-result-dialog">View result</button>
+    {:else}
+      <span>Guess {Math.min(guesses.length + 1, MAX_GUESSES)} of {MAX_GUESSES}</span>
+    {/if}
   <GameHelp game="Fivefold">
       <p>Find the hidden five-letter word in six guesses. Enter a word using your keyboard or the on-screen keys, then press <strong>Enter</strong>. Each guess must be in our word list.</p>
       <ul>
@@ -215,16 +238,27 @@
     <span><span class="legend-swatch absent-color" aria-hidden="true"></span> No match</span>
   </div>
 
-  <p id="fivefold-status" class="game-status" class:error={inputError && !finished} role="status" aria-live="polite" aria-atomic="true">{status}</p>
+  <p id="fivefold-status" class:game-status={!won} class:sr-only={won} class:error={inputError && !finished} role="status" aria-live="polite" aria-atomic="true">{status}</p>
 
   {#if ready && finished}
+    <ResultDialog id="fivefold-result-dialog" headingId="fivefold-result-heading" bind:open={resultOpen}>
     <section class="result" aria-labelledby="fivefold-result-heading">
-      <h2 id="fivefold-result-heading">{won ? 'Solved' : 'Out of guesses'}</h2>
-      {#if !won}<p>The word was <strong class="answer">{answer}</strong>.</p>{/if}
-      <button class="button share-button" type="button" onclick={copyResult} disabled={sharing}>
-        {sharing ? 'Copying…' : 'Copy result'}
+      {#if won}
+        <div class="solved-word" aria-hidden="true">
+          {#each answer as letter, index (index)}
+            <span class="solved-letter" style:--letter-index={index}>{letter}</span>
+          {/each}
+        </div>
+      {/if}
+      <h2 id="fivefold-result-heading">{won ? 'Word found!' : 'Out of guesses'}</h2>
+      {#if won}
+        <p class="solve-summary">Solved in <strong>{guesses.length} {guesses.length === 1 ? 'guess' : 'guesses'}</strong>.</p>
+      {:else}
+        <p>The word was <strong class="answer">{answer}</strong>.</p>
+      {/if}
+      <button class="button share-button" type="button" onclick={handleShare} disabled={sharing}>
+        {nativeSharing ? 'Share' : 'Copy'}
       </button>
-      <p class="share-hint">A spoiler-free grid and a link to this exact puzzle.</p>
       <p class="share-status" role="status" aria-live="polite">{shareMessage}</p>
       {#if shareFallback}
         <label class="share-label" for="fivefold-share">Your shareable result</label>
@@ -238,6 +272,10 @@
         ></textarea>
       {/if}
     </section>
+      <div class="copy-toast" role="status" aria-live="polite" aria-atomic="true">
+        {#if showCopyToast}<span>Result copied.</span>{/if}
+      </div>
+    </ResultDialog>
   {/if}
 
   <div class="keyboard" role="group" aria-label="On-screen keyboard" aria-describedby="fivefold-status">
@@ -342,6 +380,7 @@
 
   .game-status.error { color: #a42c35; font-weight: 650; }
   .keyboard { display: grid; gap: 6px; width: 100%; }
+  .fivefold :global(.inline-result) { margin-bottom: 20px; }
   .keyboard-row { display: flex; justify-content: center; gap: 4px; }
   .middle-row { padding-inline: 5%; }
 
@@ -372,21 +411,21 @@
   .key:active:not(:disabled) { transform: translateY(1px); border-bottom-width: 1px; }
   .key:focus-visible, .share-fallback:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
 
-  .result {
-    margin: 0 0 1.25rem;
-    padding: 1.1rem 0;
-    border-top: 1px solid var(--line);
-    text-align: center;
-  }
 
-  .result h2 { margin: 0 0 .8rem; font-size: 1.1rem; }
-  .result > p { margin: 0.3rem 0 1rem; color: var(--muted); font-size: 0.9rem; line-height: 1.5; }
+  .result h2 { margin: 0 0 8px; font-size: 1.5rem; color: var(--ink); }
+  .result > p { margin: 8px 0 0; color: var(--muted); font-size: 0.9rem; line-height: 1.5; }
+  .solved-word { display: flex; justify-content: center; gap: 6px; margin: 0 0 14px; }
+  .solved-letter { display: grid; place-items: center; width: clamp(32px, 9vw, 44px); aspect-ratio: 1; border: 2px solid var(--correct); border-radius: 5px; background: var(--correct); color: #fff; font-size: clamp(1.1rem, 5vw, 1.5rem); font-weight: 800; line-height: 1; }
+  .solved-word .solved-letter { animation: solved-pop 10s ease-out infinite; animation-delay: calc(var(--letter-index) * 120ms); }
+  .solve-summary strong { color: var(--ink); font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+  @keyframes solved-pop { 0% { transform: none; } 2% { transform: translateY(6px) scale(.85); } 6.6% { transform: translateY(-5px) scale(1.08); } 12%, 100% { transform: none; } }
   .answer { color: var(--ink); letter-spacing: 0.1em; }
-  .share-button { min-height: 44px; }
-  .result > .share-hint { margin: 0.7rem 0 0; font-size: 0.76rem; }
+  .share-button { min-height: 44px; margin-top: 16px; }
   .result > .share-status { margin: 0.6rem 0 0; font-size: 0.82rem; }
   .share-status:empty { display: none; }
   .share-label { display: block; margin-top: 1rem; text-align: left; font-size: 0.82rem; font-weight: 650; }
+  .copy-toast { position: fixed; left: 16px; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 10; display: flex; justify-content: center; pointer-events: none; }
+  .copy-toast span { max-width: 100%; padding: 12px 18px; border-radius: 8px; background: var(--ink); color: var(--paper); box-shadow: 0 3px 14px #342a4030; font-size: .9rem; font-weight: 650; line-height: 1.4; overflow-wrap: anywhere; }
 
   .share-fallback {
     box-sizing: border-box;
@@ -428,5 +467,6 @@
   @media (prefers-reduced-motion: reduce) {
     .tile { transition: none; }
     .key:active:not(:disabled) { transform: none; }
+    .solved-word .solved-letter { animation: none; }
   }
 </style>

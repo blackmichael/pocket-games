@@ -1,8 +1,10 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
   import GameHelp from '#lib/platform/GameHelp.svelte';
+  import ResultDialog from '#lib/platform/ResultDialog.svelte';
   import { loadSave, saveSave } from '#lib/platform/storage.js';
   import { puzzleKey, puzzleUrl, type PuzzleIdentity } from '#lib/platform/types.js';
+  import { shareResult, supportsNativeShare } from '#lib/platform/share.js';
   import { generate, placementConflicts, isSolved, parseSavedGame, SAVE_VERSION, SIZE } from './engine.js';
 
   let { identity }: { identity: PuzzleIdentity } = $props();
@@ -17,6 +19,7 @@
   let warning = $state<string | null>(null);
   let message = $state('');
   let solved = $state(false);
+  let resultOpen = $state(false);
   let elapsedMs = $state(0);
   let timeRecorded = $state(true);
   const conflicts = $derived(selected.filter((cell) => placementConflicts(selected, cell, puzzle).length > 0));
@@ -25,6 +28,7 @@
   let shareMessage = $state('');
   let shareFallback = $state(false);
   let sharing = $state(false);
+  let nativeSharing = $state(false);
   let showCopyToast = $state(false);
   let accumulatedMs = 0;
   let startedAt = 0;
@@ -71,6 +75,7 @@
     accumulatedMs = restored.value?.elapsedMs ?? 0;
     elapsedMs = accumulatedMs;
     started = solved;
+    nativeSharing = supportsNativeShare();
     ready = true;
     message = solved ? 'Puzzle solved. All ten kings are in place.' : '';
     const storageKey = key;
@@ -79,6 +84,7 @@
     document.addEventListener('visibilitychange', onHidden);
     return () => {
       if (!solved) saveSave(storageKey, { version: SAVE_VERSION, selected, elapsedMs: elapsedNow() });
+      ready = false;
       stopClock();
       if (celebrationHandle !== undefined) window.clearTimeout(celebrationHandle);
       window.removeEventListener('pagehide', persist);
@@ -110,6 +116,7 @@
     if (solved) {
       stopClock();
       celebrating = true;
+      resultOpen = true;
       celebrationHandle = window.setTimeout(() => { celebrating = false; }, 1600);
       message = `Solved in ${elapsedText}. All ten kings are in place.`;
     }
@@ -123,25 +130,26 @@
     persist();
   }
 
-  async function copyResult(event: MouseEvent) {
+  async function handleShare(event: MouseEvent) {
     if (!ready || !solved || sharing) return;
     (event.currentTarget as HTMLButtonElement).blur();
     showCopyToast = false;
-    shareText = [
+    const text = [
       'Kings — solved',
       identity.mode === 'daily' ? `Daily puzzle · ${identity.date}` : 'Seeded puzzle',
-      timeRecorded ? `Time: ${elapsedText}` : 'Time not recorded',
-      '',
-      puzzleUrl(identity, window.location.origin)
+      timeRecorded ? `Time: ${elapsedText}` : 'Time not recorded'
     ].join('\n');
+    const url = puzzleUrl(identity, window.location.origin);
     sharing = true;
     shareMessage = '';
+    shareFallback = false;
     try {
-      if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
-      await navigator.clipboard.writeText(shareText);
-      shareFallback = false;
-      showCopyToast = true;
+      const outcome = await shareResult({ title: 'Kings — Pocket Games', text, url });
+      if (!ready || outcome === 'cancelled') return;
+      showCopyToast = outcome === 'copied';
     } catch {
+      if (!ready) return;
+      shareText = `${text}\n\n${url}`;
       shareFallback = true;
       shareMessage = 'Clipboard access is unavailable. Select and copy your result below.';
     } finally {
@@ -177,7 +185,11 @@
 <section class="kings" aria-label="Kings game">
   {#if warning}<p class="notice" role="status">{warning}</p>{/if}
   <div class="game-meta">
-    <span>{selected.length} / {SIZE} kings</span>
+    {#if solved}
+      <button class="text-link result-trigger" type="button" onclick={() => { resultOpen = true; }} aria-haspopup="dialog" aria-controls="kings-result-dialog">View result</button>
+    {:else}
+      <span>{selected.length} / {SIZE} kings</span>
+    {/if}
   <GameHelp game="Kings">
     <p>Choose ten squares. Use each row, column, and colored region exactly once. No two kings may share an edge or corner. Tap a placed king to remove it. Conflicting crowns stay on the board, outlined and marked with × until you resolve their placements.</p>
     <p>Select Start puzzle or Resume puzzle to uncover the board and start the timer. It stops when you solve the puzzle. Your board and elapsed time are saved in this browser; time before starting or with the page closed does not count.</p>
@@ -239,18 +251,18 @@
       </div>
     {/if}
   </div>
-  <p id="kings-status" class="status" class:empty={!message && !conflicts.length} class:error={conflicts.length > 0} role="status" aria-live="polite" aria-atomic="true">{#if conflicts.length}{conflicts.length} crowns conflict. Marked crowns share a row, column, or region, or touch. Tap a crown to remove it.{:else}{message}{/if}</p>
+  <p id="kings-status" class:status={!solved} class:sr-only={solved} class:empty={!message && !conflicts.length} class:error={conflicts.length > 0} role="status" aria-live="polite" aria-atomic="true">{#if conflicts.length}{conflicts.length} crowns conflict. Marked crowns share a row, column, or region, or touch. Tap a crown to remove it.{:else}{message}{/if}</p>
   {#if solved}
-    <section class="result" class:celebrating aria-labelledby="kings-result-heading">
+    <ResultDialog id="kings-result-dialog" headingId="kings-result-heading" bind:open={resultOpen} onDismiss={() => { celebrating = false; }}>
+    <section class="result" aria-labelledby="kings-result-heading">
       <div class="result-crown" aria-hidden="true">{@render crown()}</div>
       <h2 id="kings-result-heading" class="success">Royal victory!</h2>
       <p>All ten kings are in place.</p>
       {#if timeRecorded}<p class="result-time">Solved in <strong>{elapsedText}</strong></p>
       {:else}<p class="result-time">Time wasn’t recorded for this earlier solve.</p>{/if}
-      <button class="button share-button" type="button" onclick={copyResult} disabled={sharing}>
-        {sharing ? 'Copying…' : 'Share result'}
+      <button class="button share-button" type="button" onclick={handleShare} disabled={sharing}>
+        {nativeSharing ? 'Share' : 'Copy'}
       </button>
-      <p class="share-hint">Copy your result and a link to this exact puzzle.</p>
       <p class="share-status" role="status" aria-live="polite">{shareMessage}</p>
       {#if shareFallback}
         <label class="share-label" for="kings-share">Your shareable result</label>
@@ -264,12 +276,13 @@
         ></textarea>
       {/if}
     </section>
+      <div class="copy-toast" role="status" aria-live="polite" aria-atomic="true">
+        {#if showCopyToast}<span>Result copied.</span>{/if}
+      </div>
+    </ResultDialog>
   {:else}
     <button class="text-link clear-button" type="button" onclick={reset} disabled={!ready || !started || selected.length === 0}>Clear board</button>
   {/if}
-  <div class="copy-toast" role="status" aria-live="polite" aria-atomic="true">
-    {#if showCopyToast}<span>Result copied.</span>{/if}
-  </div>
 </section>
 
 <style>
@@ -309,29 +322,27 @@
   .status { min-height: 1.5em; font-weight: 600; line-height: 1.5; }
   .status.empty { min-height: 0; margin: 0; }
   .status.error { color: var(--invalid); }
-  .result { margin: 18px 0 0; padding: 18px 12px; border: 2px solid var(--accent-line); border-radius: 12px; background: var(--accent-soft); }
-  .result-crown { width: 80px; height: 72px; margin: 0 auto 4px; }
+  .result-crown { width: 80px; height: 72px; margin: 8px auto 20px; }
   .success { margin: 0 0 8px; font-size: 1.5rem; color: var(--ink); }
   .result p { margin: 8px 0 0; }
   .result-time { color: var(--muted); font-size: .9rem; }
   .result-time strong { color: var(--ink); font-size: 1.15rem; font-variant-numeric: tabular-nums; }
   .share-button { min-height: 44px; margin-top: 16px; }
-  .result .share-hint { font-size: .76rem; color: var(--muted); }
   .result .share-status { font-size: .82rem; }
   .share-status:empty { margin: 0; }
   .share-label { display: block; margin-top: 16px; text-align: left; font-size: .82rem; font-weight: 650; }
   .share-fallback { box-sizing: border-box; display: block; width: 100%; margin-top: 6px; padding: 12px; border: 1px solid var(--accent-line); border-radius: 6px; background: var(--paper); color: var(--ink); font-family: inherit; font-size: 1rem; line-height: 1.6; overflow-wrap: anywhere; resize: vertical; }
   .copy-toast { position: fixed; left: 16px; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 10; display: flex; justify-content: center; pointer-events: none; }
   .copy-toast span { max-width: 100%; padding: 12px 18px; border-radius: 8px; background: var(--ink); color: var(--paper); box-shadow: 0 3px 14px #342a4030; font-size: .9rem; font-weight: 650; line-height: 1.4; overflow-wrap: anywhere; }
-  .result.celebrating .result-crown { animation: coronation .65s ease-out; }
+  .result .result-crown { animation: coronation 10s cubic-bezier(.65, 0, .35, 1) infinite; transform-origin: 50% 50%; }
   .confetti { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 3; }
   .confetti-piece { position: absolute; top: -12px; left: var(--left); width: 7px; height: 12px; background: var(--color); opacity: 0; animation: confetti-fall 1.4s var(--delay) ease-out both; }
   .confetti-piece:nth-child(3n) { border-radius: 50%; width: 8px; height: 8px; }
   .clear-button { margin-top: 16px; min-height: 44px; padding: .5rem .75rem; font-size: .85rem; }
-  @keyframes coronation { 0% { transform: translateY(12px) scale(.7) rotate(-8deg); } 65% { transform: translateY(-5px) scale(1.1) rotate(4deg); } 100% { transform: none; } }
+  @keyframes coronation { 0% { transform: rotate(0deg); } 15%, 100% { transform: rotate(720deg); } }
   @keyframes confetti-fall { 0% { opacity: 0; transform: translate(0, -16px) rotate(0); } 12% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--drift), 390px) rotate(var(--spin)); } }
   @media (prefers-reduced-motion: reduce) {
-    .result.celebrating .result-crown { animation: none; }
+    .result .result-crown { animation: none; }
     .confetti { display: none; }
   }
 </style>

@@ -1,8 +1,10 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
   import GameHelp from '#lib/platform/GameHelp.svelte';
+  import ResultDialog from '#lib/platform/ResultDialog.svelte';
   import { loadSave, saveSave } from '#lib/platform/storage.js';
   import { puzzleKey, puzzleUrl, type PuzzleIdentity } from '#lib/platform/types.js';
+  import { shareResult, supportsNativeShare } from '#lib/platform/share.js';
   import { generate, conflictingCells, isSolved, chooseHintCell, parseSavedGame, SAVE_VERSION, SIZE, type Cell, type Puzzle } from './engine.js';
   import poppyPortrait from './poppy.svg?url';
 
@@ -15,6 +17,7 @@
   let started = $state(false);
   let resumed = $state(false);
   let solved = $state(false);
+  let resultOpen = $state(false);
   let celebrating = $state(false);
   let selected = $state(0);
   let boardElement = $state<HTMLDivElement | null>(null);
@@ -30,6 +33,7 @@
   let shareText = $state('');
   let shareError = $state('');
   let sharing = $state(false);
+  let nativeSharing = $state(false);
   let showCopyToast = $state(false);
   let conflicts = $state<number[]>([]);
   const filled = $derived(board.filter((cell) => cell !== 0).length);
@@ -79,12 +83,14 @@
     solved = isSolved(board, puzzle);
     started = solved;
     selected = Math.max(0, puzzle.givens.findIndex((cell) => cell === 0));
+    nativeSharing = supportsNativeShare();
     ready = true;
     const onHidden = () => { if (document.visibilityState === 'hidden') persist(); };
     window.addEventListener('pagehide', persist);
     document.addEventListener('visibilitychange', onHidden);
     return () => {
       persist();
+      ready = false;
       stopClock();
       if (toastHandle !== undefined) window.clearTimeout(toastHandle);
       if (celebrationHandle !== undefined) window.clearTimeout(celebrationHandle);
@@ -111,6 +117,7 @@
     if (solved) {
       stopClock();
       celebrating = true;
+      resultOpen = true;
       celebrationHandle = window.setTimeout(() => { celebrating = false; }, 2200);
     }
     persist();
@@ -170,19 +177,23 @@
     const value = event.key.toLowerCase() === 'd' ? 1 : event.key.toLowerCase() === 'c' ? 2 : ['Backspace', 'Delete'].includes(event.key) ? 0 : null;
     if (value !== null) { event.preventDefault(); setCell(selected, value); }
   }
-  async function copyResult() {
-    if (!solved || sharing) return;
+  async function handleShare(event: MouseEvent) {
+    if (!ready || !solved || sharing) return;
+    (event.currentTarget as HTMLButtonElement).blur();
     if (toastHandle !== undefined) window.clearTimeout(toastHandle);
     showCopyToast = false;
-    shareText = ['Catdog — solved', identity.mode === 'daily' ? `Daily puzzle · ${identity.date}` : 'Seeded puzzle', `Time: ${elapsedText}`, '', puzzleUrl(identity, window.location.origin)].join('\n');
+    const text = ['Catdog — solved', identity.mode === 'daily' ? `Daily puzzle · ${identity.date}` : 'Seeded puzzle', `Time: ${elapsedText}`].join('\n');
+    const url = puzzleUrl(identity, window.location.origin);
     sharing = true;
+    shareError = '';
     try {
-      if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
-      await navigator.clipboard.writeText(shareText);
-      shareError = '';
-      showCopyToast = true;
-      toastHandle = window.setTimeout(() => { showCopyToast = false; }, 4000);
+      const outcome = await shareResult({ title: 'Catdog — Pocket Games', text, url });
+      if (!ready || outcome === 'cancelled') return;
+      showCopyToast = outcome === 'copied';
+      if (showCopyToast) toastHandle = window.setTimeout(() => { showCopyToast = false; }, 4000);
     } catch {
+      if (!ready) return;
+      shareText = `${text}\n\n${url}`;
       shareError = 'Clipboard access is unavailable. Select and copy your result below.';
     } finally { sharing = false; }
   }
@@ -220,7 +231,11 @@
 <section class="catdog" aria-label="Catdog game">
   {#if warning}<p class="notice" role="status">{warning}</p>{/if}
   <div class="game-meta">
-    <span>{started ? `${filled} / 36 filled` : '6 × 6 puzzle'}</span>
+    {#if solved}
+      <button class="text-link result-trigger" type="button" onclick={() => { resultOpen = true; }} aria-haspopup="dialog" aria-controls="catdog-result-dialog">View result</button>
+    {:else}
+      <span>{started ? `${filled} / 36 filled` : '6 × 6 puzzle'}</span>
+    {/if}
   <GameHelp game="Catdog">
     <ul>
       <li>Put three dogs and three cats in every row and column.</li>
@@ -272,15 +287,20 @@
   </div>
   <p class="status" class:error={conflicts.length > 0} role="status" aria-live="polite" aria-atomic="true">{#if conflicts.length}{conflicts.length} squares conflict: check row/column balance, triples, and = / × relations. Correct any marked entries.{:else}{message || (started ? 'Fill each square with Poppy or Pigeon.' : 'Start to uncover your puzzle.')}{/if}</p>
   {#if solved}
-    <section class="result" class:celebrating aria-labelledby="catdog-result">
+    <ResultDialog id="catdog-result-dialog" headingId="catdog-result" bind:open={resultOpen} onDismiss={() => { celebrating = false; }}>
+    <section class="result" aria-labelledby="catdog-result">
       <div class="result-pets" aria-hidden="true"><span class="result-pet">{@render symbol(1)}</span><span class="result-pet">{@render symbol(2)}</span></div>
-      <h2 id="catdog-result">Puzzle solved!</h2><p>All rows, columns, and relations are balanced.</p><p>Solved in <strong>{elapsedText}</strong></p><button class="button" type="button" onclick={copyResult} disabled={sharing}>{sharing ? 'Copying…' : 'Share result'}</button><p class="share-hint">Copy your result and a link to this exact puzzle.</p>
+      <h2 id="catdog-result">Puzzle solved!</h2>
+      <p>All rows, columns, and relations are balanced.</p>
+      <p class="result-time">Solved in <strong>{elapsedText}</strong></p>
+      <button class="button share-button" type="button" onclick={handleShare} disabled={sharing}>{nativeSharing ? 'Share' : 'Copy'}</button>
       {#if shareError}<p role="status">{shareError}</p><label for="catdog-share">Your shareable result</label><textarea id="catdog-share" readonly rows={5} value={shareText} onclick={(event) => event.currentTarget.select()}></textarea>{/if}
     </section>
+      <div class="copy-toast" role="status" aria-live="polite" aria-atomic="true">{#if showCopyToast}<span>Result copied.</span>{/if}</div>
+    </ResultDialog>
   {:else}
     <div class="controls"><button class="button secondary" type="button" disabled={!started || !history.length} onclick={undo}>Undo</button><button class="button secondary" type="button" disabled={!ready || !started} onclick={hint}>Hint</button><button class="button secondary clear-button" type="button" disabled={!started || !hasMoves} onclick={clear}><span class:inactive={clearPending} aria-hidden={clearPending}>Clear entries</span><span class:inactive={!clearPending} aria-hidden={!clearPending}>Confirm?</span></button></div>
   {/if}
-  <div class="copy-toast" role="status" aria-live="polite" aria-atomic="true">{#if showCopyToast}<span>Result copied.</span>{/if}</div>
 </section>
 
 <style>
@@ -318,20 +338,22 @@
   .confetti-piece:nth-child(3n) { border-radius: 50%; width: 9px; height: 9px; }
   .result-pets { display: flex; justify-content: center; gap: 8px; margin-bottom: 6px; }
   .result-pet { display: grid; place-items: center; width: 76px; height: 76px; }
-  .result.celebrating .result-pet { animation: pet-bounce 1s ease-out both; }
-  .result.celebrating .result-pet:last-child { animation-delay: .1s; }
-  .result h2 { margin: 8px 0; font-size: 1.25rem; }
-  .result p { margin: 8px 0; }
-  .share-hint { color: var(--muted); font-size: .85rem; }
+  .result .result-pet { animation: pet-bounce 10s ease-out infinite; }
+  .result .result-pet:last-child { animation-delay: .1s; }
+  .result h2 { margin: 0 0 8px; font-size: 1.5rem; color: var(--ink); }
+  .result p { margin: 8px 0 0; }
+  .result-time { color: var(--muted); font-size: .9rem; }
+  .result-time strong { color: var(--ink); font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+  .share-button { min-height: 44px; margin-top: 16px; }
   textarea { display: block; box-sizing: border-box; width: 100%; margin-top: 8px; font-size: 16px; }
   .copy-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 20; pointer-events: none; }
   .copy-toast span { display: block; border-radius: 10px; padding: 12px 20px; background: var(--ink); color: var(--paper); box-shadow: 0 4px 18px #0002; white-space: nowrap; }
   .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   @keyframes confetti-fall { 0% { opacity: 0; transform: translate(0, -16px) rotate(0); } 12% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--drift), 430px) rotate(var(--spin)); } }
-  @keyframes pet-bounce { 0% { transform: translateY(14px) scale(.65) rotate(-10deg); } 35% { transform: translateY(-16px) scale(1.12) rotate(7deg); } 65% { transform: translateY(3px) scale(.97) rotate(-3deg); } 100% { transform: none; } }
+  @keyframes pet-bounce { 0% { transform: none; } 1.2% { transform: translateY(14px) scale(.65) rotate(-10deg); } 3.6% { transform: translateY(-16px) scale(1.12) rotate(7deg); } 6.6% { transform: translateY(3px) scale(.97) rotate(-3deg); } 10.2%, 100% { transform: none; } }
   @media (prefers-reduced-motion: reduce) {
     .confetti { display: none; }
-    .result.celebrating .result-pet { animation: none; }
+    .result .result-pet { animation: none; }
   }
   @media (max-width: 500px) {
     .board-wrap { width: min(100%, 320px); }
