@@ -3,7 +3,7 @@
 ## Product and architecture
 - Static SvelteKit 3 / Svelte 5 / TypeScript application, built with Vite and adapter-static. Supported Node range: ^22.17.0 || ^24.0.0 || >=26.0.0; Node 23 and 25 are unsupported by the build/test toolchain.
 - No runtime server, database, accounts, external game-data requests, analytics/ad SDKs, or scheduled generation. Do not add them to implement a game.
-- Daily puzzles use the calendar date in America/Chicago (DST-aware). Browser clock is authoritative. Never use UTC date slicing or a fixed CST offset for daily selection.
+- Daily puzzles and day-scoped catalog navigation memory use the browser's local calendar date and timezone (DST-aware). Browser clock is authoritative. Use local date components, never UTC date slicing or a fixed timezone offset for daily selection. Explicit puzzle dates retain their original seed encoding.
 - Generate only the selected puzzle in the browser. Catalog imports metadata only. Game components, engines, dictionaries, assets, and workers stay behind explicit dynamic imports.
 - Prerender catalog and game shells, not puzzle instances. Dates/seeds are browser-resolved query parameters. Do not disable SSR globally or require a catch-all SPA rewrite.
 - Game logic is pure TypeScript, separate from Svelte and persistence. No Math.random(), time, locale sorting, or mutable global RNG in generators.
@@ -20,7 +20,7 @@
 
 ## Source map
 - src/lib/catalog.ts: small metadata-only catalog; never re-export game code here.
-- src/lib/platform/daily.ts: Chicago dates and v1 puzzle identities/link validation.
+- src/lib/platform/daily.ts: browser-local dates and v1 puzzle identities/link validation.
 - src/lib/platform/types.ts: PuzzleIdentity, puzzleKey, pinned share URLs.
 - src/lib/platform/storage.ts: guarded small localStorage saves and warnings.
 - src/lib/games/fivefold/: reference implementation, frozen word data, engine tests, license attribution.
@@ -48,11 +48,12 @@ Use that guide's generator-diversity, puzzle-aware save-validation, native-dialo
 - Use self-hosted Lilita One at its native 400 weight only for the wordmark. Body/game text stays in system fonts. Keep the Latin-only import/preload and public font license; do not add Google Fonts runtime requests or synthetic font weights.
 - Keep the subtle neutral console/controller outline pattern confined to the shared content wrapper. Header/footer remain plain, and game surfaces stay opaque for readability. Its original SVG lives in src/lib/assets/console-pattern.svg and is inlined into CSS; do not add animation or external pattern requests.
 - Midnight never destroys an active board. Offer the newly available daily instead.
+- Catalog cards remember each game's last selected puzzle only for the local calendar day it was opened. After local midnight, entering from the catalog opens the current daily; explicit links and stored puzzle progress remain unchanged. Refresh destinations on focus, visibility return, and navigation activation.
 - Invalid links must show an error rather than silently select another puzzle.
 - Storage/clipboard denial cannot block play: show a truthful warning or a manual-copy option.
 - Never claim that game performance measures intelligence or clinical cognition.
 
 ## Verification and delivery
-Run check, tests, and static build after changes. Launch the production preview and exercise the actual game in a browser: legal and rejected input, win/loss, duplicate feedback where relevant, refresh/resume, shared link, mobile layout, and unavailable storage. Inspect network resources: catalog must not fetch game/dictionary chunks. Tests should cover rules, seed vectors, validity, state transitions, and Chicago boundaries. Keep dataset licenses intact. Use Git history for change tracking; a separate changelog is not required.
+Run check, tests, and static build after changes. Launch the production preview and exercise the actual game in a browser: legal and rejected input, win/loss, duplicate feedback where relevant, refresh/resume, shared link, mobile layout, and unavailable storage. Inspect network resources: catalog must not fetch game/dictionary chunks. Tests should cover rules, seed vectors, validity, state transitions, local midnight boundaries, multiple timezones, and DST transitions. Keep dataset licenses intact. Use Git history for change tracking; a separate changelog is not required.
 
 Restart an already running Vite production preview after rebuilding: its static-file cache can otherwise serve the previous build.

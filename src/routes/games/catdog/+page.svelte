@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import type { Component } from 'svelte';
   import { afterNavigate } from '$app/navigation';
-  import { chicagoDate, dailyIdentity, displayDate, resolvePuzzle } from '#lib/platform/daily.js';
+  import { localDate, dailyIdentity, displayDate, resolvePuzzle } from '#lib/platform/daily.js';
   import { puzzleKey, puzzleUrl, type PuzzleIdentity } from '#lib/platform/types.js';
   import PuzzlePicker from '#lib/platform/PuzzlePicker.svelte';
   import { rememberPuzzle } from '#lib/platform/lastPuzzle.js';
@@ -25,9 +25,9 @@
   afterNavigate(({ to }) => { if (to) syncPuzzle(new URL(to.url.href)); });
   onMount(() => {
     let alive = true;
-    today = chicagoDate(); syncPuzzle(new URL(location.href));
+    today = localDate(); syncPuzzle(new URL(location.href));
     import('#lib/games/catdog/Catdog.svelte').then((module) => { if (alive) Game = module.default; }).catch(() => { if (alive) loadError = true; });
-    const refresh = () => { const current = chicagoDate(); if (current !== today) { today = current; newDay = true; } };
+    const refresh = () => { const current = localDate(); if (current !== today) { today = current; newDay = true; } };
     const interval = window.setInterval(refresh, 30_000);
     window.addEventListener('focus', refresh);
     const onVisibility = () => { if (document.visibilityState === 'visible') refresh(); };

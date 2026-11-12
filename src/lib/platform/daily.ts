@@ -1,15 +1,9 @@
 import type { PuzzleIdentity } from './types';
 
-export const DAILY_TIME_ZONE = 'America/Chicago';
-const dayFormatter = new Intl.DateTimeFormat('en-US', {
-  timeZone: DAILY_TIME_ZONE, calendar: 'gregory', numberingSystem: 'latn',
-  year: 'numeric', month: '2-digit', day: '2-digit'
-});
-
-export function chicagoDate(now = new Date()): string {
-  const parts = dayFormatter.formatToParts(now);
-  const part = (name: string) => parts.find((p) => p.type === name)!.value;
-  return part('year') + '-' + part('month') + '-' + part('day');
+export function localDate(now = new Date()): string {
+  return String(now.getFullYear()).padStart(4, '0') + '-' +
+    String(now.getMonth() + 1).padStart(2, '0') + '-' +
+    String(now.getDate()).padStart(2, '0');
 }
 
 export function isCalendarDate(value: string): boolean {
@@ -36,7 +30,7 @@ export function resolvePuzzle(gameId: string, url: URL, now = new Date()): { ide
   if (params.has('v') && params.get('v') !== '1')
     return { identity: null, error: 'This generator version is not available for this game.' };
   if (params.has('seed')) return { identity: seedIdentity(gameId, params.get('seed')!), error: null };
-  const date = params.get('date') ?? chicagoDate(now);
+  const date = params.get('date') ?? localDate(now);
   if (!isCalendarDate(date)) return { identity: null, error: 'That date is not valid. Use a calendar date in YYYY-MM-DD format.' };
   return { identity: dailyIdentity(gameId, date), error: null };
 }

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import { chicagoDate, dailyIdentity, isCalendarDate, seedIdentity } from './daily.js';
+  import { localDate, dailyIdentity, isCalendarDate, seedIdentity } from './daily.js';
   import { puzzleUrl, type PuzzleIdentity } from './types.js';
 
   let { gameId, identity }: { gameId: string; identity: PuzzleIdentity | null } = $props();
@@ -26,7 +26,7 @@
 
   function openPicker() {
     if (!ready || dialog.open) return;
-    const today = chicagoDate();
+    const today = localDate();
     customSeed = identity?.mode === 'seed' ? identity.seed : '';
     selectedDate = identity?.date ?? today;
     editingDate = false;
@@ -122,11 +122,11 @@
   <div class="date-picker">
     <label for={`${id}-date`}>Daily date</label>
     <input id={`${id}-date`} type="date" bind:value={selectedDate} onfocus={() => { editingDate = true; }} onblur={finishDate} onkeydown={(event) => { if (event.key === 'Escape') editingDate = false; if (event.key === 'Enter' && !event.ctrlKey && !event.metaKey && !event.altKey) { event.preventDefault(); editingDate = false; openDate(event.currentTarget.value); } }} disabled={pending} min="0001-01-01" max="9999-12-31" required aria-describedby={`${id}-date-help`} />
-    <p class="field-help" id={`${id}-date-help`}>Finish choosing a date in the calendar, or press Enter, to open its puzzle. Daily puzzles change at midnight in Chicago.</p>
+    <p class="field-help" id={`${id}-date-help`}>Finish choosing a date in the calendar, or press Enter, to open its puzzle. Daily puzzles change at midnight in your timezone.</p>
   </div>
 
   <div class="quick-actions">
-    <button class="button secondary" type="button" disabled={pending} onclick={() => void selectPuzzle(dailyIdentity(gameId, chicagoDate()))}>Today’s puzzle</button>
+    <button class="button secondary" type="button" disabled={pending} onclick={() => void selectPuzzle(dailyIdentity(gameId, localDate()))}>Today’s puzzle</button>
     <button class="button secondary" type="button" disabled={pending} onclick={randomPuzzle}>Random puzzle</button>
   </div>
   {#if pending}<p class="field-help" role="status">Opening puzzle…</p>{/if}

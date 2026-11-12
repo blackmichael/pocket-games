@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import type { Component } from 'svelte';
   import { page } from '$app/state';
-  import { chicagoDate, dailyIdentity, displayDate, resolvePuzzle } from '#lib/platform/daily.js';
+  import { localDate, dailyIdentity, displayDate, resolvePuzzle } from '#lib/platform/daily.js';
   import { puzzleKey, puzzleUrl, type PuzzleIdentity } from '#lib/platform/types.js';
   import PuzzlePicker from '#lib/platform/PuzzlePicker.svelte';
   import { rememberPuzzle } from '#lib/platform/lastPuzzle.js';
@@ -32,13 +32,13 @@
 
   onMount(() => {
     let alive = true;
-    today = chicagoDate();
+    today = localDate();
     ready = true;
     import('#lib/games/fivefold/Fivefold.svelte')
       .then((module) => { if (alive) Game = module.default; })
       .catch(() => { if (alive) loadError = true; });
     const refreshDate = () => {
-      const current = chicagoDate();
+      const current = localDate();
       if (current !== today) { today = current; newDay = true; }
     };
     const interval = window.setInterval(refreshDate, 30_000);

@@ -1,18 +1,30 @@
 <script lang="ts">
   import { games } from '#lib/catalog.js';
   import { onMount } from 'svelte';
-  import { chicagoDate, displayDate } from '#lib/platform/daily.js';
+  import { localDate, displayDate } from '#lib/platform/daily.js';
   import { lastPuzzleHref } from '#lib/platform/lastPuzzle.js';
   const gameCardColors = ['#AD8BEB', '#F5C542', '#59CDA4', '#F58676', '#6ACAE8', '#EE91C2'] as const;
   let today = $state('');
   let puzzleLinks = $state<Record<string, string>>({});
+  function refreshLink(event: MouseEvent, game: (typeof games)[number]) {
+    (event.currentTarget as HTMLAnchorElement).href = lastPuzzleHref(game.id, location.origin) ?? game.href;
+  }
   onMount(() => {
-    const updateDate = () => { today = chicagoDate(); };
+    const updateDate = () => {
+      const now = new Date();
+      today = localDate(now);
+      puzzleLinks = Object.fromEntries(games.map((game) => [game.id, lastPuzzleHref(game.id, location.origin, now) ?? game.href]));
+    };
     updateDate();
     const interval = window.setInterval(updateDate, 30_000);
     window.addEventListener('focus', updateDate);
-    puzzleLinks = Object.fromEntries(games.map((game) => [game.id, lastPuzzleHref(game.id, location.origin) ?? game.href]));
-    return () => { clearInterval(interval); window.removeEventListener('focus', updateDate); };
+    const onVisibility = () => { if (document.visibilityState === 'visible') updateDate(); };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', updateDate);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   });
 </script>
 
@@ -28,7 +40,7 @@
   <ul class="game-list">
     {#each games as game, index}
       <li style:--card-background={gameCardColors[index % gameCardColors.length]}>
-        <a class="game-card" href={puzzleLinks[game.id] ?? game.href} aria-labelledby="game-title-{game.id}" aria-describedby="game-description-{game.id}">
+        <a class="game-card" href={puzzleLinks[game.id] ?? game.href} onclickcapture={(event) => refreshLink(event, game)} onauxclickcapture={(event) => refreshLink(event, game)} aria-labelledby="game-title-{game.id}" aria-describedby="game-description-{game.id}">
           <div class="game-copy">
             <h2 id="game-title-{game.id}">{game.title}</h2>
             <p id="game-description-{game.id}">{game.description}</p>

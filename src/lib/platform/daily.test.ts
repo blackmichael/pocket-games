@@ -1,22 +1,39 @@
-import { describe, expect, it } from 'vitest';
-import { chicagoDate, dailyIdentity, isCalendarDate, resolvePuzzle, seedIdentity } from './daily';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { localDate, dailyIdentity, isCalendarDate, resolvePuzzle, seedIdentity } from './daily';
 import { puzzleKey, puzzleUrl } from './types';
 
 const origin = 'https://example.com';
 const resolve = (gameId: string, query: string, now?: Date) =>
   resolvePuzzle(gameId, new URL('/games/' + gameId + '/' + query, origin), now);
 
-describe('Chicago daily identity', () => {
+afterEach(() => vi.unstubAllEnvs());
+
+describe('browser-local daily identity', () => {
   it.each([
-    ['2026-01-02T05:59:59Z', '2026-01-01'], ['2026-01-02T06:00:00Z', '2026-01-02'],
-    ['2026-07-02T04:59:59Z', '2026-07-01'], ['2026-07-02T05:00:00Z', '2026-07-02'],
-    ['2026-03-08T05:59:59Z', '2026-03-07'], ['2026-03-08T06:00:00Z', '2026-03-08'],
-    ['2026-03-08T07:59:59Z', '2026-03-08'], ['2026-03-08T08:00:00Z', '2026-03-08'],
-    ['2026-11-01T04:59:59Z', '2026-10-31'], ['2026-11-01T05:00:00Z', '2026-11-01'],
-    ['2026-11-01T06:59:59Z', '2026-11-01'], ['2026-11-01T07:00:00Z', '2026-11-01'],
-    ['2026-11-08T05:59:59Z', '2026-11-07'], ['2026-11-08T06:00:00Z', '2026-11-08'],
-    ['2026-11-09T05:59:59Z', '2026-11-08'], ['2026-11-09T06:00:00Z', '2026-11-09']
-  ])('maps %s to %s', (instant, date) => expect(chicagoDate(new Date(instant))).toBe(date));
+    ['UTC', '2026-01-01T23:59:59Z', '2026-01-01'],
+    ['UTC', '2026-01-02T00:00:00Z', '2026-01-02'],
+    ['America/Los_Angeles', '2026-01-02T07:59:59Z', '2026-01-01'],
+    ['America/Los_Angeles', '2026-01-02T08:00:00Z', '2026-01-02'],
+    ['Asia/Kathmandu', '2026-01-01T18:14:59Z', '2026-01-01'],
+    ['Asia/Kathmandu', '2026-01-01T18:15:00Z', '2026-01-02'],
+    ['America/New_York', '2026-03-08T06:59:59Z', '2026-03-08'],
+    ['America/New_York', '2026-03-08T07:00:00Z', '2026-03-08'],
+    ['America/New_York', '2026-11-01T05:59:59Z', '2026-11-01'],
+    ['America/New_York', '2026-11-01T06:00:00Z', '2026-11-01'],
+    ['America/New_York', '2026-03-09T03:59:59Z', '2026-03-08'],
+    ['America/New_York', '2026-03-09T04:00:00Z', '2026-03-09'],
+    ['America/New_York', '2026-11-02T04:59:59Z', '2026-11-01'],
+    ['America/New_York', '2026-11-02T05:00:00Z', '2026-11-02']
+  ])('selects the local daily in %s at %s', (timezone, instant, date) => {
+    vi.stubEnv('TZ', timezone);
+    const now = new Date(instant);
+    expect(localDate(now)).toBe(date);
+    for (const gameId of ['kings', 'fivefold', 'sunmoon']) {
+      expect(resolve(gameId, '', now).identity).toEqual(dailyIdentity(gameId, date));
+      expect(resolve(gameId, '?v=1', now).identity).toEqual(dailyIdentity(gameId, date));
+      expect(resolve(gameId, '?date=2026-01-01', now).identity).toEqual(dailyIdentity(gameId, '2026-01-01'));
+    }
+  });
 
   it.each(['', '0000-01-01', '2026-02-29', '2026-04-31', '2026-1-01'])('rejects invalid date %s', (date) => {
     expect(isCalendarDate(date)).toBe(false);
@@ -24,7 +41,7 @@ describe('Chicago daily identity', () => {
   it('accepts leap days', () => expect(isCalendarDate('2024-02-29')).toBe(true));
 
   it('keeps the original Fivefold daily identity and storage key', () => {
-    const identity = resolve('fivefold', '', new Date('2026-01-02T05:00:00Z')).identity;
+    const identity = resolve('fivefold', '?date=2026-01-01', new Date(2026, 0, 2, 12)).identity;
     expect(identity).toEqual({
       gameId: 'fivefold', mode: 'daily', date: '2026-01-01',
       seed: '["daily","fivefold","2026-01-01","standard",1]', generatorVersion: 1
@@ -45,18 +62,6 @@ describe('Chicago daily identity', () => {
     }
   });
 
-  it.each([
-    ['2026-11-08T05:59:59Z', '2026-11-07'],
-    ['2026-11-08T06:00:00Z', '2026-11-08'],
-    ['2026-11-09T05:59:59Z', '2026-11-08'],
-    ['2026-11-09T06:00:00Z', '2026-11-09']
-  ])('selects the daily at Chicago instant %s', (instant, date) => {
-    const now = new Date(instant);
-    for (const gameId of ['kings', 'fivefold', 'sunmoon']) {
-      expect(resolve(gameId, '', now).identity).toEqual(dailyIdentity(gameId, date));
-      expect(resolve(gameId, '?v=1', now).identity).toEqual(dailyIdentity(gameId, date));
-    }
-  });
 
   it('uses v1 for arbitrary seeds', () => {
     for (const gameId of ['kings', 'fivefold', 'sunmoon']) {
