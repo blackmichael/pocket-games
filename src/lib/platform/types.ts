@@ -3,7 +3,7 @@ export interface PuzzleIdentity {
   mode: 'daily' | 'seed';
   seed: string;
   date?: string;
-  generatorVersion: 1;
+  generatorVersion: 1 | 2;
 }
 
 export function puzzleKey(identity: PuzzleIdentity): string {

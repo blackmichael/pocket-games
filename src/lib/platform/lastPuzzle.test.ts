@@ -28,13 +28,18 @@ describe('per-game catalog puzzle memory', () => {
     rememberPuzzle(seedIdentity('fivefold', 'second'), origin);
     expect(lastPuzzleHref('fivefold', origin)).toBe('/games/fivefold/?seed=second&v=1');
     expect(lastPuzzleHref('kings', origin)).toBe('/games/kings/?date=2026-11-10&v=1');
-    expect(lastPuzzleHref('sunmoon', origin)).toBe('/games/catdog/?seed=pets&v=1');
+    expect(lastPuzzleHref('sunmoon', origin)).toBe('/games/catdog/?seed=pets&v=2');
   });
 
   it.each(['', ' a+b & café 🌱 ', 'e\u0301'])('preserves exact seed %j', (seed) => {
     const identity = seedIdentity('sunmoon', seed);
     rememberPuzzle(identity, origin);
     expect(resolvePuzzle('sunmoon', new URL(lastPuzzleHref('sunmoon', origin)!, origin)).identity).toEqual(identity);
+  });
+
+  it('preserves a selected Catdog v1 link instead of silently upgrading its board', () => {
+    rememberPuzzle(seedIdentity('sunmoon', 'legacy', 1), origin);
+    expect(lastPuzzleHref('sunmoon', origin)).toBe('/games/catdog/?seed=legacy&v=1');
   });
 
   it.each([

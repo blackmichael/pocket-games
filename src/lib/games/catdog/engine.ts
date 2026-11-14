@@ -1,8 +1,12 @@
 export const SIZE = 6;
 export const SAVE_VERSION = 2;
-export const MAX_DIFFICULTY = 30;
 
 export type Cell = 0 | 1 | 2;
+
+export type Deduction = { cell: number; value: 1 | 2 } & (
+  { rule: 'relation'; source: number; same: boolean } |
+  { rule: 'line-consensus'; axis: 'row' | 'column'; index: number; patterns: readonly number[] }
+);
 
 export interface Clue {
   a: number;
@@ -137,9 +141,11 @@ function makeSolver(clues: readonly Clue[], order: Uint8Array = NATURAL_ORDER) {
 }
 /**
  * Cells left after forced line-pattern deductions and relation propagation.
- * A solvable puzzle scores 0–36; no guessing or solution lookup is used.
+ * Zero means a complete deduction path for a valid puzzle, not a difficulty rating.
+ * Optional steps record each forced placement and its supporting clue or patterns.
+ * No guessing or solution lookup is used; inputs are never mutated.
  */
-export function difficulty(puzzle: Pick<Puzzle, 'givens' | 'clues'>): number {
+export function unresolvedAfterDeductions(puzzle: Pick<Puzzle, 'givens' | 'clues'>, steps?: Deduction[]): number {
   const board = Uint8Array.from(puzzle.givens);
   const same = new Uint8Array(SIZE * 2);
   const different = new Uint8Array(SIZE * 2);
@@ -158,7 +164,9 @@ export function difficulty(puzzle: Pick<Puzzle, 'givens' | 'clues'>): number {
       if ((board[a] === 0) === (board[b] === 0)) continue;
       const fixed = board[a] === 0 ? b : a;
       const other = fixed === a ? b : a;
-      board[other] = same ? board[fixed] : 3 - board[fixed];
+      const value = (same ? board[fixed] : 3 - board[fixed]) as 1 | 2;
+      board[other] = value;
+      steps?.push({ cell: other, value, rule: 'relation', source: fixed, same });
       unresolved -= 1;
       changed = true;
     }
@@ -174,10 +182,12 @@ export function difficulty(puzzle: Pick<Puzzle, 'givens' | 'clues'>): number {
       }
       let everySun = FULL_ROW;
       let anySun = 0;
+      const patterns: number[] | undefined = steps ? [] : undefined;
       for (const mask of ROW_PATTERNS) {
         if ((mask & fixedSuns) !== fixedSuns || (mask & fixedMoons) !== 0) continue;
         const changes = mask ^ (mask >>> 1);
         if ((changes & same[line]) !== 0 || (changes & different[line]) !== different[line]) continue;
+        patterns?.push(mask);
         everySun &= mask;
         anySun |= mask;
       }
@@ -185,9 +195,12 @@ export function difficulty(puzzle: Pick<Puzzle, 'givens' | 'clues'>): number {
         const cell = start + offset * step;
         if (board[cell] !== 0) continue;
         const bit = 1 << offset;
-        if ((everySun & bit) !== 0) board[cell] = 1;
-        else if ((anySun & bit) === 0) board[cell] = 2;
-        else continue;
+        const value = (everySun & bit) !== 0 ? 1 : (anySun & bit) === 0 ? 2 : 0;
+        if (value === 0) continue;
+        board[cell] = value;
+        if (steps && patterns) {
+          steps.push({ cell, value, rule: 'line-consensus', axis: line < SIZE ? 'row' : 'column', index: line % SIZE, patterns });
+        }
         unresolved -= 1;
         changed = true;
       }
@@ -207,8 +220,11 @@ export function difficulty(puzzle: Pick<Puzzle, 'givens' | 'clues'>): number {
  * Replace relations touching givens with equivalent fixed pets until stable,
  * then minimize givens in reverse shuffled-cell order. No time budgets,
  * external data, or fallback puzzles.
+ * Generator v1 keeps its published ceiling of 30 unresolved cells. V2 requires
+ * complete deductions; the RNG, solution construction and clue order stay fixed.
  */
-export function generate(seed: string): Puzzle {
+export function generate(seed: string, generatorVersion: 1 | 2 = 2): Puzzle {
+  const maximumUnresolved = generatorVersion === 1 ? 30 : 0;
   let state = hash(seed + '\u0000sunmoon-v1');
   function random(): number {
     state = (state + 0x6d2b79f5) >>> 0;
@@ -286,25 +302,25 @@ export function generate(seed: string): Puzzle {
     if (remainingCount(givens, 2) !== 1) givens[cell] = solution[cell];
   }
   const puzzle = { givens, clues, solution };
-  let score = difficulty(puzzle);
-  while (score > MAX_DIFFICULTY) {
+  let unresolved = unresolvedAfterDeductions(puzzle);
+  while (unresolved > maximumUnresolved) {
     let bestCell = -1;
-    let bestScore = score;
+    let bestUnresolved = unresolved;
     for (const cell of cells) {
       if (givens[cell] !== 0) continue;
       givens[cell] = solution[cell];
-      const candidateScore = difficulty(puzzle);
+      const candidateUnresolved = unresolvedAfterDeductions(puzzle);
       givens[cell] = 0;
-      if (candidateScore < bestScore) {
+      if (candidateUnresolved < bestUnresolved) {
         bestCell = cell;
-        bestScore = candidateScore;
+        bestUnresolved = candidateUnresolved;
       }
-      if (bestScore === 0) break;
+      if (bestUnresolved === 0) break;
     }
-    // At least one unresolved cell improves the score; each pass adds a given.
+    // Adding a solution given always resolves at least that cell, so this terminates.
     givens[bestCell] = solution[bestCell];
     propagateGivens();
-    score = difficulty(puzzle);
+    unresolved = unresolvedAfterDeductions(puzzle);
   }
   return puzzle;
 }

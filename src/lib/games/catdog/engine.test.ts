@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chooseHintCell, conflictingCells, difficulty, generate, isSolved, MAX_DIFFICULTY, parseSavedGame, SAVE_VERSION, SIZE, type Cell, type Clue, type Puzzle } from './engine';
+import { chooseHintCell, conflictingCells, unresolvedAfterDeductions, generate, isSolved, parseSavedGame, SAVE_VERSION, SIZE, type Cell, type Clue, type Deduction, type Puzzle } from './engine';
 
 const CELLS = SIZE * SIZE;
 const blank = (): Cell[] => Array<Cell>(CELLS).fill(0);
@@ -119,11 +119,32 @@ function canonical(puzzle: Puzzle, layout: boolean): string {
 }
 
 describe('Catdog generator', () => {
-  it.each(vectors)('freezes every puzzle field for seed "$seed"', ({ seed, givens, solution, clues }) => {
-    expect(generate(seed)).toEqual({ givens: cells(givens), solution: cells(solution), clues });
+  it.each(vectors)('freezes every v1 puzzle field for seed "$seed"', ({ seed, givens, solution, clues }) => {
+    expect(generate(seed, 1)).toEqual({ givens: cells(givens), solution: cells(solution), clues });
   });
 
-  it('constructs valid puzzles with exactly one independently enumerated completion below the difficulty ceiling', () => {
+  it('tightens v2 without changing published v1 boards or rerolling their solution', () => {
+    const legacy = generate('version-check-8', 1);
+    expect(legacy.givens).toEqual(cells('000000000000000000000000000010020010'));
+    expect(unresolvedAfterDeductions(legacy)).toBe(30);
+    const current = generate('version-check-8', 2);
+    expect(current).toEqual({
+      givens: cells('000000000000000000000000000010120010'),
+      solution: cells('211221121212122121212121211212122112'),
+      clues: [
+        { a: 1, b: 7, same: false }, { a: 11, b: 17, same: false },
+        { a: 17, b: 23, same: true }, { a: 26, b: 32, same: false },
+        { a: 8, b: 9, same: false }, { a: 7, b: 13, same: true },
+        { a: 18, b: 24, same: true }, { a: 15, b: 21, same: true },
+        { a: 9, b: 10, same: false }
+      ]
+    });
+    expect(current.solution).toEqual(legacy.solution);
+    expect(unresolvedAfterDeductions(current)).toBe(0);
+    expect(completions(current)).toEqual([legacy.solution]);
+  });
+
+  it('constructs uniquely solvable puzzles with a complete no-guess deduction path', () => {
     const seeds = [...vectors.map(({ seed }) => seed), ...Array.from({ length: 100 }, (_, index) => `sample-${index}`)];
     for (const seed of seeds) {
       const puzzle = generate(seed);
@@ -133,7 +154,7 @@ describe('Catdog generator', () => {
       expect(givenCount).toBeGreaterThan(0);
       expect(givenCount).toBeLessThan(CELLS);
       expect(puzzle.clues.length).toBeLessThanOrEqual(10);
-      expect(difficulty(puzzle)).toBeLessThanOrEqual(MAX_DIFFICULTY);
+      expect(unresolvedAfterDeductions(puzzle)).toBe(0);
       const edges = new Set<string>();
       for (const { a, b, same } of puzzle.clues) {
         expect(Number.isInteger(a) && Number.isInteger(b)).toBe(true);
@@ -234,11 +255,11 @@ describe('Catdog generator', () => {
   });
 });
 
-describe('Catdog difficulty', () => {
+describe('Catdog logical deductions', () => {
   it('counts unresolved cells without guessing from unanchored relations', () => {
-    expect(difficulty({ givens: blank(), clues: [] })).toBe(CELLS);
-    expect(difficulty({ givens: blank(), clues: [{ a: 0, b: 1, same: true }] })).toBe(CELLS);
-    expect(difficulty({ givens: [...legal], clues: [] })).toBe(0);
+    expect(unresolvedAfterDeductions({ givens: blank(), clues: [] })).toBe(CELLS);
+    expect(unresolvedAfterDeductions({ givens: blank(), clues: [{ a: 0, b: 1, same: true }] })).toBe(CELLS);
+    expect(unresolvedAfterDeductions({ givens: [...legal], clues: [] })).toBe(0);
   });
 
   it.each(['row', 'column'])('fills forced legal %s patterns before counting', (direction) => {
@@ -246,7 +267,7 @@ describe('Catdog difficulty', () => {
     for (let offset = 0; offset < SIZE - 1; offset += 1) {
       givens[direction === 'row' ? offset : offset * SIZE] = legal[offset];
     }
-    expect(difficulty({ givens, clues: [] })).toBe(CELLS - SIZE);
+    expect(unresolvedAfterDeductions({ givens, clues: [] })).toBe(CELLS - SIZE);
   });
 
   it('repeats known-relation propagation and row consensus to a fixed point', () => {
@@ -257,25 +278,72 @@ describe('Catdog difficulty', () => {
       { a: 1, b: 2, same: false },
       { a: 0, b: 1, same: false },
     ];
-    expect(difficulty({ givens, clues })).toBe(CELLS - SIZE);
-    expect(difficulty({ givens, clues: [] })).toBe(CELLS - 1);
+    expect(unresolvedAfterDeductions({ givens, clues })).toBe(CELLS - SIZE);
+    expect(unresolvedAfterDeductions({ givens, clues: [] })).toBe(CELLS - 1);
   });
 
   it('does not read the stored solution or mutate givens and relations', () => {
     const puzzle: Puzzle = {
       givens: blank(),
       clues: [{ a: 0, b: 1, same: false }],
-      get solution(): Cell[] { throw new Error('Difficulty must not consult the answer'); },
+      get solution(): Cell[] { throw new Error('Deductions must not consult the answer'); },
     };
     puzzle.givens[0] = 1;
     Object.freeze(puzzle.givens);
     Object.freeze(puzzle.clues[0]);
     Object.freeze(puzzle.clues);
-    expect(difficulty(puzzle)).toBe(CELLS - 2);
+    const steps: Deduction[] = [];
+    expect(unresolvedAfterDeductions(puzzle, steps)).toBe(CELLS - 2);
+    expect(steps).toEqual([{ cell: 1, value: 2, rule: 'relation', source: 0, same: false }]);
     expect(puzzle.givens[1]).toBe(0);
   });
 
-  it('adds givens to an over-ceiling board without rerolling its solution', () => {
+  it('records a replayable path where every move follows from the current clues, not the answer', () => {
+    for (const seed of ['version-check-7', ...Array.from({ length: 24 }, (_, index) => `deduction-path-${index}`)]) {
+      const puzzle = generate(seed);
+      const steps: Deduction[] = [];
+      const before = JSON.stringify(puzzle);
+      expect(unresolvedAfterDeductions(puzzle, steps)).toBe(0);
+      expect(JSON.stringify(puzzle)).toBe(before);
+      const board = [...puzzle.givens];
+      for (const step of steps) {
+        expect(board[step.cell]).toBe(0);
+        if (step.rule === 'relation') {
+          expect(puzzle.clues.some(({ a, b, same }) =>
+            same === step.same && ((a === step.source && b === step.cell) || (b === step.source && a === step.cell))
+          )).toBe(true);
+          expect(board[step.source]).not.toBe(0);
+          expect(step.value).toBe(step.same ? board[step.source] : 3 - board[step.source]);
+        } else {
+          const line = Array.from({ length: SIZE }, (_, offset) =>
+            step.axis === 'row' ? step.index * SIZE + offset : offset * SIZE + step.index
+          );
+          const offset = line.indexOf(step.cell);
+          expect(offset).toBeGreaterThanOrEqual(0);
+          // Independently enumerate all binary lines; do not reuse the engine's masks.
+          const candidates: number[] = [];
+          for (let mask = 0; mask < 1 << SIZE; mask += 1) {
+            const values = line.map((_, bit) => (mask & 1 << bit) !== 0 ? 1 : 2);
+            if (values.filter((value) => value === 1).length !== 3) continue;
+            if (values.some((value, index) => index >= 2 && value === values[index - 1] && value === values[index - 2])) continue;
+            if (line.some((cell, index) => board[cell] !== 0 && board[cell] !== values[index])) continue;
+            if (puzzle.clues.some(({ a, b, same }) => {
+              const first = line.indexOf(a), second = line.indexOf(b);
+              return first >= 0 && second >= 0 && (values[first] === values[second]) !== same;
+            })) continue;
+            candidates.push(mask);
+          }
+          expect([...step.patterns].sort((a, b) => a - b)).toEqual(candidates);
+          expect(new Set(candidates.map((mask) => (mask & 1 << offset) !== 0 ? 1 : 2))).toEqual(new Set([step.value]));
+        }
+        board[step.cell] = step.value;
+      }
+      expect(board).toEqual(puzzle.solution);
+      expect(isSolved(board, puzzle)).toBe(true);
+    }
+  });
+
+  it('adds givens until deductions finish without rerolling the solution', () => {
     const original: Puzzle = {
       givens: cells('100000000020000000010000000000000000'),
       solution: cells('112212121221221121212112112212221121'),
@@ -286,8 +354,7 @@ describe('Catdog difficulty', () => {
         { a: 3, b: 4, same: false }, { a: 16, b: 17, same: false },
       ],
     };
-    expect(difficulty(original)).toBe(32);
-    expect(difficulty(original)).toBeGreaterThan(MAX_DIFFICULTY);
+    expect(unresolvedAfterDeductions(original)).toBe(32);
     expect(completions(original)).toEqual([original.solution]);
     const adjusted = generate('ceiling-regression-0');
     expect(adjusted.solution).toEqual(original.solution);
@@ -295,7 +362,7 @@ describe('Catdog difficulty', () => {
       if (original.givens[cell] !== 0) expect(adjusted.givens[cell]).toBe(original.givens[cell]);
     }
     expect(adjusted.givens.filter((value) => value !== 0).length).toBeGreaterThan(original.givens.filter((value) => value !== 0).length);
-    expect(difficulty(adjusted)).toBeLessThanOrEqual(MAX_DIFFICULTY);
+    expect(unresolvedAfterDeductions(adjusted)).toBe(0);
     expect(completions(adjusted)).toEqual([original.solution]);
   });
 });

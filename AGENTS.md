@@ -3,11 +3,12 @@
 ## Product and architecture
 - Static SvelteKit 3 / Svelte 5 / TypeScript application, built with Vite and adapter-static. Supported Node range: ^22.17.0 || ^24.0.0 || >=26.0.0; Node 23 and 25 are unsupported by the build/test toolchain.
 - No runtime server, database, accounts, external game-data requests, analytics/ad SDKs, or scheduled generation. Do not add them to implement a game.
-- Daily puzzles and day-scoped catalog navigation memory use the browser's local calendar date and timezone (DST-aware). Browser clock is authoritative. Use local date components, never UTC date slicing or a fixed timezone offset for daily selection. Explicit puzzle dates retain their original seed encoding.
+- Daily puzzles and day-scoped catalog navigation memory use the browser's local calendar date and timezone (DST-aware). Browser clock is authoritative. Use local date components, never UTC date slicing or a fixed timezone offset for daily selection. Pinned date/version links retain their original seed encoding.
 - Generate only the selected puzzle in the browser. Catalog imports metadata only. Game components, engines, dictionaries, assets, and workers stay behind explicit dynamic imports.
 - Prerender catalog and game shells, not puzzle instances. Dates/seeds are browser-resolved query parameters. Do not disable SSR globally or require a catch-all SPA rewrite.
 - Game logic is pure TypeScript, separate from Svelte and persistence. No Math.random(), time, locale sorting, or mutable global RNG in generators.
 - Keep the exact seed-to-puzzle mapping stable under a generator version, including word-list ordering and all generation data. Version saves independently. Preserve published reproducibility when intentionally upgrading.
+- New Catdog puzzles use generator v2 and must reach zero unresolved cells using relation propagation and unanimous valid line patterns, without guessing or consulting the answer. Preserve generator v1's published allowance of 30 unresolved cells, boards, links, and saves; its component passes identity.generatorVersion into generate. The unresolved count is not a human difficulty rating. Fivefold and Kings remain on v1. Save formats are independent of generator versions, and puzzle keys separate their progress.
 - Local-only progress is intentionally untrusted. Do not add fairness enforcement or account-shaped abstractions. Possible future AT Protocol support is not current work.
 
 ## Commands
@@ -20,7 +21,7 @@
 
 ## Source map
 - src/lib/catalog.ts: small metadata-only catalog; never re-export game code here.
-- src/lib/platform/daily.ts: browser-local dates and v1 puzzle identities/link validation.
+- src/lib/platform/daily.ts: browser-local dates and versioned puzzle identities/link validation.
 - src/lib/platform/types.ts: PuzzleIdentity, puzzleKey, pinned share URLs.
 - src/lib/platform/storage.ts: guarded small localStorage saves and warnings.
 - src/lib/games/fivefold/: reference implementation, frozen word data, engine tests, license attribution.
