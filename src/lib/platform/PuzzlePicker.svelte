@@ -69,6 +69,10 @@
 
   function openSeed(event: SubmitEvent) {
     event.preventDefault();
+    if (!customSeed.trim()) {
+      error = 'Enter a custom seed.';
+      return;
+    }
     void selectPuzzle(seedIdentity(gameId, customSeed));
   }
 
@@ -113,10 +117,10 @@
   <form onsubmit={openSeed}>
     <label for={`${id}-seed`}>Custom seed</label>
     <div class="field-row">
-      <input id={`${id}-seed`} type="text" bind:value={customSeed} autocomplete="off" spellcheck="false" aria-describedby={`${id}-seed-help`} />
+      <input id={`${id}-seed`} type="text" bind:value={customSeed} required autocomplete="off" spellcheck="false" aria-describedby={`${id}-seed-help`} />
       <button class="button" type="submit" disabled={pending} aria-label="Open custom seed">Open</button>
     </div>
-    <p class="field-help" id={`${id}-seed-help`}>The same seed and generator version give the same puzzle. An empty seed works too.</p>
+    <p class="field-help" id={`${id}-seed-help`}>Enter a nonblank seed. The same seed and generator version give the same puzzle.</p>
   </form>
 
   <div class="date-picker">
