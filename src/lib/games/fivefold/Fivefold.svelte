@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import GameHelp from '#lib/platform/GameHelp.svelte';
   import ResultDialog from '#lib/platform/ResultDialog.svelte';
+  import WordKeyboard from '#lib/platform/WordKeyboard.svelte';
   import { puzzleKey, puzzleUrl, type PuzzleIdentity } from '#lib/platform/types.js';
   import { loadSave, saveSave } from '#lib/platform/storage.js';
   import { shareResult, supportsNativeShare } from '#lib/platform/share.js';
@@ -18,7 +19,6 @@
 
   let { identity }: { identity: PuzzleIdentity } = $props();
 
-  const keyboardRows = ['QWERTYUIOP'.split(''), 'ASDFGHJKL'.split(''), ['Enter', ...'ZXCVBNM', 'Backspace']];
   const ranks: Record<LetterState, number> = { absent: 0, present: 1, correct: 2 };
   const descriptions: Record<LetterState, string> = {
     absent: 'no matching copy',
@@ -278,30 +278,7 @@
     </ResultDialog>
   {/if}
 
-  <div class="keyboard" role="group" aria-label="On-screen keyboard" aria-describedby="fivefold-status">
-    {#each keyboardRows as row, index (index)}
-      <div class="keyboard-row" class:middle-row={index === 1}>
-        {#each row as key (key)}
-          {@const state = keyboardStates[key]}
-          <button
-            type="button"
-            class="key {state ?? ''}"
-            class:action-key={key === 'Enter' || key === 'Backspace'}
-            disabled={!ready || finished}
-            aria-label={key === 'Backspace' ? 'Delete last letter' : state ? `${key}, ${descriptions[state]}` : key}
-            onpointerdown={(event) => event.preventDefault()}
-            onclick={() => enterKey(key)}
-          >
-            {#if key === 'Backspace'}
-              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M9 5h12v14H9l-7-7 7-7Z"/><path d="m12 9 6 6m0-6-6 6"/></svg>
-            {:else}
-              <span>{key}</span>
-            {/if}
-          </button>
-        {/each}
-      </div>
-    {/each}
-  </div>
+  <WordKeyboard onkey={enterKey} disabled={!ready || finished} describedBy="fivefold-status" states={keyboardStates} />
 
   <noscript><p class="notice">Fivefold needs JavaScript to check guesses and save your board. Enable JavaScript to play.</p></noscript>
 </section>
@@ -345,9 +322,9 @@
   .tile-letter { font-size: clamp(1.45rem, 7vw, 1.95rem); font-weight: 800; }
   .current .tile { border-color: var(--accent-line); }
   .current .tile.filled { border-color: var(--accent); background: var(--page); }
-  .tile.correct, .key.correct { background: #22724f; border-color: #22724f; color: #fff; }
-  .tile.present, .key.present { background: #f5cd47; border-color: #d6ad26; color: #49380e; }
-  .tile.absent, .key.absent { background: #6b778a; border-color: #6b778a; color: #fff; }
+  .tile.correct { background: #22724f; border-color: #22724f; color: #fff; }
+  .tile.present { background: #f5cd47; border-color: #d6ad26; color: #49380e; }
+  .tile.absent { background: #6b778a; border-color: #6b778a; color: #fff; }
 
   .color-key {
     display: flex;
@@ -379,38 +356,8 @@
   }
 
   .game-status.error { color: #a42c35; font-weight: 650; }
-  .keyboard { display: grid; gap: 6px; width: 100%; }
   .fivefold :global(.inline-result) { margin-bottom: 20px; }
-  .keyboard-row { display: flex; justify-content: center; gap: 4px; }
-  .middle-row { padding-inline: 5%; }
-
-  .key {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex: 1 1 0;
-    min-width: 0;
-    height: 51px;
-    padding: 0 1px;
-    border: 1px solid var(--key-line);
-    border-bottom-width: 3px;
-    border-radius: 5px;
-    background: var(--key-fill);
-    color: var(--ink);
-    font-family: inherit;
-    font-size: 0.9rem;
-    font-weight: 750;
-    cursor: pointer;
-    touch-action: manipulation;
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  .key.action-key { flex-grow: 1.55; font-size: 0.68rem; }
-  .key:disabled { cursor: default; }
-  .keyboard[aria-describedby] .key:disabled:not(.correct):not(.present):not(.absent) { color: #666; background: #f3f3f3; }
-  .key:active:not(:disabled) { transform: translateY(1px); border-bottom-width: 1px; }
-  .key:focus-visible, .share-fallback:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
-
+  .share-fallback:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
 
   .result h2 { margin: 0 0 8px; font-size: 1.5rem; color: var(--ink); }
   .result > p { margin: 8px 0 0; color: var(--muted); font-size: 0.9rem; line-height: 1.5; }
@@ -444,29 +391,20 @@
     resize: vertical;
   }
 
-
-  @media (hover: hover) {
-    .key:hover:not(:disabled) { filter: brightness(0.95); }
-  }
-
   @media (max-width: 500px) {
     .board { width: min(100%, 240px); }
     .game-meta { padding-bottom: .7rem; }
     .color-key { margin-top: .65rem; }
     .game-status { min-height: 2.8rem; padding-block: .45rem; }
-    .key { height: 46px; }
   }
 
   @media (max-width: 380px) {
     .game-meta { font-size: 0.76rem; }
     .color-key { gap: 0.45rem 0.65rem; font-size: 0.68rem; }
-    .key { font-size: 0.82rem; }
-    .key.action-key { font-size: 0.61rem; }
   }
 
   @media (prefers-reduced-motion: reduce) {
     .tile { transition: none; }
-    .key:active:not(:disabled) { transform: none; }
     .solved-word .solved-letter { animation: none; }
   }
 </style>

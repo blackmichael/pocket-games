@@ -35,5 +35,17 @@ export const games = [
     },
     duration: '3–7 minutes',
     href: '/games/catdog/'
+  },
+  {
+    id: 'wordladder',
+    title: 'Word Ladder',
+    category: 'Words',
+    description: 'Connect two words, changing one letter at a time.',
+    preview: {
+      src: '/previews/wordladder-game-cool.webp',
+      alt: 'Word Ladder from GAME toward COOL, showing CAME, COME, and CODE with matching letters in green.'
+    },
+    duration: '3–7 minutes',
+    href: '/games/wordladder/'
   }
 ] as const;

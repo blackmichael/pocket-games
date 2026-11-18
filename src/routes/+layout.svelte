@@ -19,6 +19,7 @@
     <p class="footer-attribution">Made by <a href="https://michaelblack.xyz">michaelblack.xyz</a></p>
     <div class="footer-links">
       <a href="/word-list-license.txt">Word list credits</a>
+      <a href="/wordladder-word-list-license.txt">Word Ladder credits</a>
       <a href="/lilita-one-license.txt">Font credits</a>
       <a href="https://github.com/blackmichael/pocket-games">Source code</a>
     </div>

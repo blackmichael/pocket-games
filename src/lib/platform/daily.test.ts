@@ -28,7 +28,7 @@ describe('browser-local daily identity', () => {
     vi.stubEnv('TZ', timezone);
     const now = new Date(instant);
     expect(localDate(now)).toBe(date);
-    for (const gameId of ['kings', 'fivefold', 'sunmoon']) {
+    for (const gameId of ['kings', 'fivefold', 'sunmoon', 'wordladder']) {
       expect(resolve(gameId, '', now).identity).toEqual(dailyIdentity(gameId, date));
       expect(resolve(gameId, '?v=1', now).identity).toEqual(dailyIdentity(gameId, date, 1));
       expect(resolve(gameId, '?date=2026-01-01', now).identity).toEqual(dailyIdentity(gameId, '2026-01-01'));
@@ -50,7 +50,7 @@ describe('browser-local daily identity', () => {
   });
 
   it.each(['2020-01-01', '2026-11-08', '2026-11-09', '2027-01-01'])('preserves v1 links for every game on daily %s', (date) => {
-    for (const gameId of ['kings', 'fivefold', 'sunmoon']) {
+    for (const gameId of ['kings', 'fivefold', 'sunmoon', 'wordladder']) {
       const version = 1;
       const identity = dailyIdentity(gameId, date, 1);
       expect(identity).toEqual({
@@ -63,7 +63,7 @@ describe('browser-local daily identity', () => {
 
 
   it('uses the current generator for unversioned arbitrary seeds', () => {
-    for (const gameId of ['kings', 'fivefold', 'sunmoon']) {
+    for (const gameId of ['kings', 'fivefold', 'sunmoon', 'wordladder']) {
       for (const seed of ['', 'random-seed', '2026-01-01']) {
         const identity = seedIdentity(gameId, seed);
         expect(identity).toEqual({ gameId, mode: 'seed', seed, generatorVersion: gameId === 'sunmoon' ? 2 : 1 });
@@ -78,7 +78,7 @@ describe('browser-local daily identity', () => {
   });
 
   it('roundtrips daily and Unicode/empty seed links for every supported version', () => {
-    for (const gameId of ['kings', 'fivefold', 'sunmoon']) {
+    for (const gameId of ['kings', 'fivefold', 'sunmoon', 'wordladder']) {
       const versions: (1 | 2)[] = gameId === 'sunmoon' ? [1, 2] : [1];
       const identities = versions.flatMap((version) => [
         ...['', 'a+b & café 🌱', ' e\u0301 ', '2026-01-01'].map((seed) => seedIdentity(gameId, seed, version)),
@@ -126,7 +126,7 @@ describe('browser-local daily identity', () => {
     '?date=', '?v=', '?date=2026-01-01&date=2026-01-02', '?v=1&v=1', '?v=2&v=2', '?v=1&v=2',
     '?v=0', '?v=3', '?v=01', '?v=1.0', '?v=latest', '?v=%202', '?v=2%20'
   ])('does not silently replace invalid identity %s', (query) => {
-    for (const gameId of ['fivefold', 'kings', 'sunmoon']) {
+    for (const gameId of ['fivefold', 'kings', 'sunmoon', 'wordladder']) {
       const result = resolve(gameId, query);
       expect(result.identity).toBeNull();
       expect(result.error).not.toBeNull();
@@ -134,7 +134,7 @@ describe('browser-local daily identity', () => {
   });
 
   it.each(['', 'seed=a&', 'date=2026-11-08&', 'date=2027-01-01&'])('rejects unavailable versions in %s', (query) => {
-    for (const gameId of ['fivefold', 'kings', 'sunmoon']) {
+    for (const gameId of ['fivefold', 'kings', 'sunmoon', 'wordladder']) {
       for (const version of gameId === 'sunmoon' ? [3, 4] : [2, 3]) {
         const result = resolve(gameId, '?' + query + 'v=' + version);
         expect(result.identity).toBeNull();

@@ -30,7 +30,7 @@
 
 <svelte:head>
   <title>Pocket Games</title>
-  <meta name="description" content="Play daily word and logic puzzles: Fivefold, Kings, and Catdog." />
+  <meta name="description" content="Play daily word and logic puzzles: Fivefold, Kings, Catdog, and Word Ladder." />
 </svelte:head>
 
 <main id="main" tabindex="-1">
