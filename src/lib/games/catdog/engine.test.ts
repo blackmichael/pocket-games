@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chooseHintCell, conflictingCells, unresolvedAfterDeductions, generate, isSolved, parseSavedGame, SAVE_VERSION, SIZE, type Cell, type Clue, type Deduction, type Puzzle } from './engine';
+import { conflictingCells, unresolvedAfterDeductions, generate, isSolved, nextDeduction, parseSavedGame, SAVE_VERSION, SIZE, type Cell, type Clue, type Deduction, type Puzzle } from './engine';
 
 const CELLS = SIZE * SIZE;
 const blank = (): Cell[] => Array<Cell>(CELLS).fill(0);
@@ -368,34 +368,19 @@ describe('Catdog logical deductions', () => {
 });
 
 describe('Catdog hints', () => {
-  it('can select every unresolved editable square, including incorrect filled entries', () => {
-    const puzzle = unrestricted();
-    puzzle.givens[0] = puzzle.solution[0];
+  it('finds the first forced move from the current board and clue patterns', () => {
+    const puzzle = generate(JSON.stringify(['daily', 'sunmoon', '2026-11-20', 'standard', 2]));
     const board = [...puzzle.givens];
-    board[2] = puzzle.solution[2];
-    board[5] = puzzle.solution[5] === 1 ? 2 : 1;
-    const eligible = Array.from({ length: CELLS }, (_, cell) => cell).filter((cell) => cell !== 0 && cell !== 2);
-    const revealed = new Set(eligible.map((_, draw) => chooseHintCell(board, puzzle, draw)));
-    expect(revealed).toEqual(new Set(eligible));
-    expect(revealed.has(5)).toBe(true);
-    expect(board[5]).not.toBe(puzzle.solution[5]);
-  });
+    const first = nextDeduction(board, puzzle.clues);
+    expect(first).toMatchObject({ cell: 1, value: 1, rule: 'line-consensus', axis: 'column', index: 1 });
+    if (first?.rule !== 'line-consensus') throw new Error('Expected a line deduction');
+    expect(first.patterns.map((mask) => Array.from({ length: SIZE }, (_, offset) => (mask & (1 << offset)) !== 0 ? 'P' : 'G').join('')))
+      .toEqual(['PGPPGG', 'PPGGPG']);
 
-  it('finds the last wrong square on a full board for either end of the random draw range', () => {
-    const puzzle = unrestricted();
-    const board = [...puzzle.solution];
-    board[35] = board[35] === 1 ? 2 : 1;
-    expect(chooseHintCell(board, puzzle, 0)).toBe(35);
-    expect(chooseHintCell(board, puzzle, 0xffff_ffff)).toBe(35);
-    expect(isSolved(board, puzzle)).toBe(false);
-  });
-
-  it('does not offer or mutate already-correct entries', () => {
-    const puzzle = unrestricted();
-    const board = Object.freeze([...puzzle.solution]);
-    expect(chooseHintCell(board, puzzle, 0)).toBeNull();
-    expect(chooseHintCell(board, puzzle, 0xffff_ffff)).toBeNull();
-    expect(board).toEqual(legal);
+    board[first.cell] = first.value;
+    expect(nextDeduction(board, puzzle.clues)).toMatchObject({
+      cell: 0, value: 2, rule: 'line-consensus', axis: 'row', index: 0,
+    });
   });
 });
 

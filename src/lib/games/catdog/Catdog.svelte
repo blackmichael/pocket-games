@@ -5,7 +5,7 @@
   import { loadSave, saveSave } from '#lib/platform/storage.js';
   import { puzzleKey, puzzleUrl, type PuzzleIdentity } from '#lib/platform/types.js';
   import { shareResult, supportsNativeShare } from '#lib/platform/share.js';
-  import { generate, conflictingCells, isSolved, chooseHintCell, parseSavedGame, SAVE_VERSION, SIZE, type Cell, type Puzzle } from './engine.js';
+  import { generate, conflictingCells, isSolved, nextDeduction, parseSavedGame, SAVE_VERSION, SIZE, type Cell, type Deduction, type Puzzle } from './engine.js';
   import poppyPortrait from './poppy.svg?url';
 
   let { identity }: { identity: PuzzleIdentity } = $props();
@@ -23,6 +23,8 @@
   let boardElement = $state<HTMLDivElement | null>(null);
   let warning = $state<string | null>(null);
   let message = $state('');
+  let hintText = $state('');
+  let highlightedCell = $state<number | null>(null);
   let clearPending = $state(false);
   let elapsedMs = $state(0);
   let accumulatedMs = 0;
@@ -39,7 +41,6 @@
   const filled = $derived(board.filter((cell) => cell !== 0).length);
   const hasMoves = $derived(puzzle ? board.some((cell, index) => cell !== puzzle?.givens[index]) : false);
   const elapsedText = $derived(formatElapsed(elapsedMs));
-  const hintDraw = new Uint32Array(1);
   const confettiPieces = Array.from({ length: 24 }, (_, index) => index);
   const confettiColors = ['#ad8beb', '#f5c542', '#59cda4', '#f58676'];
 
@@ -57,6 +58,14 @@
   function formatElapsed(milliseconds: number): string {
     const seconds = Math.floor(milliseconds / 1000);
     return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+  }
+  function hintMessage(deduction: Deduction): string {
+    if (deduction.rule === 'relation') {
+      const sameRow = Math.floor(deduction.cell / SIZE) === Math.floor(deduction.source / SIZE);
+      const line = sameRow ? `row ${Math.floor(deduction.cell / SIZE) + 1}` : `column ${deduction.cell % SIZE + 1}`;
+      return `Hint: follow the ${deduction.same ? '=' : '×'} clue between neighbors in ${line}.`;
+    }
+    return `Hint: compare the valid patterns in ${deduction.axis} ${deduction.index + 1}.`;
   }
   function elapsedNow(): number {
     return started && !solved ? Math.floor(accumulatedMs + Math.max(0, performance.now() - startedAt)) : elapsedMs;
@@ -108,6 +117,8 @@
   }
   function apply(next: Cell[], record = true) {
     if (!puzzle || !ready || !started || solved) return;
+    highlightedCell = null;
+    hintText = '';
     updateElapsed();
     if (record) history = [...history, [...board]];
     board = next;
@@ -142,24 +153,25 @@
     apply([...puzzle.givens]);
     message = 'Your entries were cleared. Givens remain; the timer is still running.';
   }
-  function hint() {
+  async function hint() {
     if (!puzzle || !ready || !started || solved) return;
-    try {
-      crypto.getRandomValues(hintDraw);
-    } catch {
-      message = 'A hint could not be chosen. Try again.';
+    hintText = '';
+    const broken = conflictingCells(board, puzzle);
+    if (broken.length) {
+      conflicts = broken;
+      message = 'Correct the conflicting entries before asking for a logic hint.';
       return;
     }
-    const cell = chooseHintCell(board, puzzle, hintDraw[0]);
-    if (cell === null) return;
-    updateElapsed();
-    accumulatedMs = elapsedMs + 10_000;
-    startedAt = performance.now();
-    elapsedMs = accumulatedMs;
-    selected = cell;
-    setCell(cell, puzzle.solution[cell]);
-    const pet = puzzle.solution[cell] === 1 ? 'Poppy' : 'Pigeon';
-    message = `Hint: row ${Math.floor(cell / SIZE) + 1}, column ${cell % SIZE + 1} is ${pet}. Added a 10 second penalty.${solved ? ` Solved in ${elapsedText}.` : ''}`;
+    const deduction = nextDeduction(board, puzzle.clues);
+    if (!deduction) {
+      message = 'No forced move is available from these entries. Correct or clear entries, then try again.';
+      return;
+    }
+    selected = deduction.cell;
+    highlightedCell = deduction.cell;
+    hintText = hintMessage(deduction);
+    await tick();
+    boardElement?.querySelector<HTMLButtonElement>(`button[data-cell="${deduction.cell}"]`)?.focus({ preventScroll: true });
   }
   function handleKey(event: KeyboardEvent) {
     if (!started || solved || event.altKey || event.ctrlKey || event.metaKey || document.querySelector('dialog[open]')) return;
@@ -243,7 +255,7 @@
       <li>= means matching neighbors; × means different neighbors.</li>
     </ul>
     <p>Shaded pets are fixed. Tap other squares to cycle empty → Poppy → Pigeon → empty.</p>
-    <p>Hint reveals a random square and adds 10 seconds.</p>
+    <p>Hint points to a forced cell and explains the relevant clue or patterns without filling it. The highlighted cell stays marked until your next move.</p>
     <p>Keyboard: arrows move; Enter/Space cycle; D enters Poppy, C enters Pigeon; Backspace/Delete erase.</p>
   </GameHelp>
     <span class="timer">Time <time datetime="PT{Math.floor(elapsedMs / 1000)}S">{elapsedText}</time></span>
@@ -257,7 +269,7 @@
               {@const cell = row * SIZE + col}
               {@const fixed = puzzle.givens[cell] !== 0}
               {@const invalid = conflicts.includes(cell)}
-              <button type="button" class="cell" class:fixed class:invalid role="gridcell" data-cell={cell} tabindex={selected === cell ? 0 : -1} aria-readonly={fixed || solved} aria-invalid={invalid ? 'true' : undefined} aria-label="Row {row + 1}, column {col + 1}, {board[cell] === 1 ? 'Poppy' : board[cell] === 2 ? 'Pigeon' : 'empty'}{fixed ? ', fixed given' : ''}{invalid ? ', conflict' : ''}" disabled={solved} onfocus={() => { selected = cell; }} onclick={() => cycle(cell)}>
+              <button type="button" class="cell" class:fixed class:invalid class:hint-highlight={highlightedCell === cell} role="gridcell" data-cell={cell} tabindex={selected === cell ? 0 : -1} aria-readonly={fixed || solved} aria-invalid={invalid ? 'true' : undefined} aria-label="Row {row + 1}, column {col + 1}, {board[cell] === 1 ? 'Poppy' : board[cell] === 2 ? 'Pigeon' : 'empty'}{fixed ? ', fixed given' : ''}{invalid ? ', conflict' : ''}" disabled={solved} onfocus={() => { selected = cell; }} onclick={() => cycle(cell)}>
                 {@render symbol(board[cell])}
                 {#if invalid}<span class="invalid-mark" aria-hidden="true">×</span>{/if}
               </button>
@@ -285,7 +297,7 @@
       </div>
     {/if}
   </div>
-  <p class="status" class:error={conflicts.length > 0} role="status" aria-live="polite" aria-atomic="true">{#if conflicts.length}{conflicts.length} squares conflict: check row/column balance, triples, and = / × relations. Correct any marked entries.{:else}{message || (started ? 'Fill each square with Poppy or Pigeon.' : 'Start to uncover your puzzle.')}{/if}</p>
+  <p class="status" class:error={conflicts.length > 0} role="status" aria-live="polite" aria-atomic="true">{#if conflicts.length}{conflicts.length} squares conflict: check row/column balance, triples, and = / × relations. Correct any marked entries.{:else if hintText}<strong>{hintText}</strong>{:else}{message || (started ? 'Fill each square with Poppy or Pigeon.' : 'Start to uncover your puzzle.')}{/if}</p>
   {#if solved}
     <ResultDialog id="catdog-result-dialog" headingId="catdog-result" bind:open={resultOpen} onDismiss={() => { celebrating = false; }}>
     <section class="result" aria-labelledby="catdog-result">
@@ -299,7 +311,7 @@
       <div class="copy-toast" role="status" aria-live="polite" aria-atomic="true">{#if showCopyToast}<span>Result copied.</span>{/if}</div>
     </ResultDialog>
   {:else}
-    <div class="controls"><button class="button secondary" type="button" disabled={!started || !history.length} onclick={undo}>Undo</button><button class="button secondary" type="button" disabled={!ready || !started} onclick={hint}>Hint</button><button class="button secondary clear-button" type="button" disabled={!started || !hasMoves} onclick={clear}><span class:inactive={clearPending} aria-hidden={clearPending}>Clear entries</span><span class:inactive={!clearPending} aria-hidden={!clearPending}>Confirm?</span></button></div>
+    <div class="controls"><button class="button secondary" type="button" disabled={!ready || !started} onclick={hint}>Hint</button><button class="button secondary clear-button" type="button" disabled={!started || !hasMoves} onclick={clear}><span class:inactive={clearPending} aria-hidden={clearPending}>Clear entries</span><span class:inactive={!clearPending} aria-hidden={!clearPending}>Confirm?</span></button></div>
   {/if}
 </section>
 
@@ -318,6 +330,7 @@
   .cell:disabled { opacity: 1; cursor: default; }
   .cell:focus-visible { z-index: 2; outline: 3px solid var(--accent); outline-offset: -4px; }
   .cell.invalid { box-shadow: inset 0 0 0 2px var(--invalid); }
+  .cell.hint-highlight { z-index: 1; box-shadow: inset 0 0 0 4px var(--accent); }
   .symbol { width: 88%; height: 88%; overflow: visible; }
   .invalid-mark { position: absolute; top: 0; right: 3px; color: var(--invalid); font-size: 15px; line-height: 1; font-weight: 800; }
   .relation { position: absolute; transform: translate(-50%, -50%); z-index: 3; width: 16px; height: 16px; line-height: 14px; border-radius: 4px; background: white; color: #36293e; font-size: 16px; font-weight: 800; pointer-events: none; }

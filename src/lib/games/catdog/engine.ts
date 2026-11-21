@@ -145,7 +145,7 @@ function makeSolver(clues: readonly Clue[], order: Uint8Array = NATURAL_ORDER) {
  * Optional steps record each forced placement and its supporting clue or patterns.
  * No guessing or solution lookup is used; inputs are never mutated.
  */
-export function unresolvedAfterDeductions(puzzle: Pick<Puzzle, 'givens' | 'clues'>, steps?: Deduction[]): number {
+export function unresolvedAfterDeductions(puzzle: Pick<Puzzle, 'givens'> & { clues: readonly Clue[] }, steps?: Deduction[]): number {
   const board = Uint8Array.from(puzzle.givens);
   const same = new Uint8Array(SIZE * 2);
   const different = new Uint8Array(SIZE * 2);
@@ -207,6 +207,15 @@ export function unresolvedAfterDeductions(puzzle: Pick<Puzzle, 'givens' | 'clues
     }
   } while (changed);
   return unresolved;
+}
+/**
+ * Return the first forced move from the current board using only its entries
+ * and the puzzle's clues. The stored solution is deliberately not an input.
+ */
+export function nextDeduction(board: readonly Cell[], clues: readonly Clue[]): Deduction | null {
+  const steps: Deduction[] = [];
+  unresolvedAfterDeductions({ givens: [...board], clues }, steps);
+  return steps[0] ?? null;
 }
 
 /**
@@ -376,22 +385,6 @@ export function isSolved(board: readonly Cell[], puzzle: Puzzle): boolean {
   return conflictingCells(board, puzzle).length === 0;
 }
 
-/** Select an empty or incorrect editable cell from an unsigned 32-bit UI draw. */
-export function chooseHintCell(board: readonly Cell[], puzzle: Puzzle, randomValue: number): number | null {
-  let remaining = 0;
-  for (let cell = 0; cell < CELLS; cell += 1) {
-    if (puzzle.givens[cell] === 0 && board[cell] !== puzzle.solution[cell]) remaining += 1;
-  }
-  if (remaining === 0) return null;
-  let choice = randomValue % remaining;
-  for (let cell = 0; cell < CELLS; cell += 1) {
-    if (puzzle.givens[cell] === 0 && board[cell] !== puzzle.solution[cell]) {
-      if (choice === 0) return cell;
-      choice -= 1;
-    }
-  }
-  return null;
-}
 
 export function parseSavedGame(value: unknown, puzzle: Puzzle): SavedGame | null {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return null;
