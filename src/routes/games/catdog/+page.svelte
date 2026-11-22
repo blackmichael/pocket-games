@@ -47,10 +47,10 @@
   </section>
 </main>
 <style>
-  main { width: min(600px, calc(100% - 40px)); margin: 28px auto 32px; padding: 24px 28px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); box-shadow: 0 3px 14px #342a4010; }
+  main { width: min(600px, calc(100% - 40px)); margin: 8px auto 32px; padding: 24px 28px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); box-shadow: 0 3px 14px #342a4010; }
   .heading { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 24px; } h1 { font-size: 1.85rem; margin: 0 0 8px; }.heading p { color: var(--muted); margin: 0; font-size: .85rem; }
   .heading > div { flex: 1; min-width: 0; }
   .surface { padding: 16px; }.meta { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: .8rem; margin-bottom: 16px; }.seed { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .text-link { min-height: 44px; }
-  @media(max-width:500px) { main { width: calc(100% - 24px); margin-top: 18px; padding: 16px 6px 8px; box-shadow: none; }.heading { margin-bottom: 12px; flex-wrap: wrap; gap: 4px 12px; }h1 { font-size: clamp(1.35rem, 6vw, 1.65rem); }.surface { padding: 8px 4px; }.meta { margin-bottom: 12px; } }
+  @media(max-width:500px) { main { width: calc(100% - 24px); margin-top: 8px; padding: 16px 6px 8px; box-shadow: none; }.heading { margin-bottom: 12px; flex-wrap: wrap; gap: 4px 12px; }h1 { font-size: clamp(1.35rem, 6vw, 1.65rem); }.surface { padding: 8px 4px; }.meta { margin-bottom: 12px; } }
 </style>
