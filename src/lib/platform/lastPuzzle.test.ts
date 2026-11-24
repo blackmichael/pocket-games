@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { localDate, dailyIdentity, resolvePuzzle, seedIdentity } from './daily.js';
 import { lastPuzzleHref, rememberPuzzle } from './lastPuzzle.js';
+import { puzzleKey } from './types.js';
 
 const origin = 'https://example.com';
 let records: Map<string, string>;
@@ -37,9 +38,93 @@ describe('per-game catalog puzzle memory', () => {
     expect(resolvePuzzle('sunmoon', new URL(lastPuzzleHref('sunmoon', origin)!, origin)).identity).toEqual(identity);
   });
 
-  it('preserves a selected Catdog v1 link instead of silently upgrading its board', () => {
-    rememberPuzzle(seedIdentity('sunmoon', 'legacy', 1), origin);
-    expect(lastPuzzleHref('sunmoon', origin)).toBe('/games/catdog/?seed=legacy&v=1');
+  it.each([
+    ['sunmoon', 'Catdog', 'catdog'],
+    ['thread', 'Ribbon', 'ribbon']
+  ])('preserves a selected %s (%s) v1 link instead of silently upgrading its board', (gameId, _title, path) => {
+    rememberPuzzle(seedIdentity(gameId, 'legacy', 1), origin);
+    expect(lastPuzzleHref(gameId, origin)).toBe(`/games/${path}/?seed=legacy&v=1`);
+  });
+
+  it('retains Ribbon v1 daily and exact custom-seed selections throughout the same day', () => {
+    const opened = new Date(2026, 10, 12, 0, 1);
+    const later = new Date(2026, 10, 12, 23, 59);
+    const identities = [
+      dailyIdentity('thread', '2020-01-01'),
+      ...['', ' a+b & café 🌱 ', 'e\u0301'].map((seed) => seedIdentity('thread', seed))
+    ];
+    for (const identity of identities) {
+      rememberPuzzle(identity, origin, opened);
+      const href = lastPuzzleHref('thread', origin, later)!;
+      const url = new URL(href, origin);
+      expect(url.pathname).toBe('/games/ribbon/');
+      expect(url.searchParams.get('v')).toBe('1');
+      expect(resolvePuzzle('thread', url).identity).toEqual(identity);
+    }
+  });
+
+  it('remembers new Ribbon selections as pinned v1 under the original thread storage key', () => {
+    rememberPuzzle(seedIdentity('sunmoon', 'pets'), origin);
+    rememberPuzzle(dailyIdentity('thread', '2026-11-12'), origin);
+    expect(lastPuzzleHref('thread', origin)).toBe('/games/ribbon/?date=2026-11-12&v=1');
+    rememberPuzzle(seedIdentity('thread', 'new board'), origin);
+    expect(lastPuzzleHref('thread', origin)).toBe('/games/ribbon/?seed=new+board&v=1');
+    expect(JSON.parse(records.get('puzzle-room:last-puzzle:thread')!)).toEqual({
+      date: localDate(), url: origin + '/games/ribbon/?seed=new+board&v=1'
+    });
+    expect(records.has('puzzle-room:last-puzzle:ribbon')).toBe(false);
+    expect(lastPuzzleHref('sunmoon', origin)).toBe('/games/catdog/?seed=pets&v=2');
+  });
+
+  it.each(['sunmoon', 'kings', 'fivefold', 'wordladder', 'thread'])('rejects remembered v3 links for %s', (gameId) => {
+    const path = gameId === 'sunmoon' ? 'catdog' : gameId === 'thread' ? 'ribbon' : gameId;
+    records.set('puzzle-room:last-puzzle:' + gameId, JSON.stringify({
+      date: localDate(), url: `/games/${path}/?seed=unavailable&v=3`
+    }));
+    expect(lastPuzzleHref(gameId, origin)).toBeNull();
+  });
+
+  it.each(['/games/ribbon/', '/games/thread/'])('rejects remembered Ribbon v2 links at %s', (path) => {
+    records.set('puzzle-room:last-puzzle:thread', JSON.stringify({
+      date: localDate(), url: path + '?seed=unavailable&v=2'
+    }));
+    expect(lastPuzzleHref('thread', origin)).toBeNull();
+  });
+
+  it('canonicalizes same-day legacy Ribbon navigation without changing its v1 identity', () => {
+    const identities = [
+      dailyIdentity('thread', '2020-01-01'),
+      ...['', ' a+b & café 🌱 ', 'e\u0301'].map((seed) => seedIdentity('thread', seed))
+    ];
+    for (const identity of identities) {
+      rememberPuzzle(identity, origin);
+      const key = 'puzzle-room:last-puzzle:thread';
+      const saved = JSON.parse(records.get(key)!);
+      saved.url = saved.url.replace('/games/ribbon/', '/games/thread/');
+      records.set(key, JSON.stringify(saved));
+      const href = lastPuzzleHref('thread', origin)!;
+      expect(new URL(href, origin).pathname).toBe('/games/ribbon/');
+      expect(resolvePuzzle('thread', new URL(href, origin)).identity).toEqual(identity);
+      expect(lastPuzzleHref('thread', origin, new Date(2026, 10, 13))).toBeNull();
+    }
+  });
+
+  it.each([
+    'https://evil.example/games/thread/?seed=a&v=1',
+    '/games/thread/', '/games/thread/?v=1', '/games/thread/?seed=a&v=3',
+    '/games/thread/?seed=a&seed=b&v=1', '/games/thread/?date=2026-02-30&v=1',
+    '/games/thread/?seed=a&date=2026-11-12&v=1',
+    '/games/kings/?seed=a&v=1', '/games/thread/extra/?seed=a&v=1'
+  ])('rejects invalid legacy Ribbon navigation %s', (url) => {
+    records.set('puzzle-room:last-puzzle:thread', JSON.stringify({ date: localDate(), url }));
+    expect(lastPuzzleHref('thread', origin)).toBeNull();
+  });
+
+  it('does not accept legacy Ribbon navigation for another game', () => {
+    records.set('puzzle-room:last-puzzle:kings', JSON.stringify({
+      date: localDate(), url: '/games/thread/?seed=legacy&v=1'
+    }));
+    expect(lastPuzzleHref('kings', origin)).toBeNull();
   });
 
   it.each([
@@ -70,10 +155,13 @@ describe('per-game catalog puzzle memory', () => {
     vi.stubEnv('TZ', timezone);
     rememberPuzzle(seedIdentity('fivefold', 'night'), origin, new Date(opened));
     rememberPuzzle(dailyIdentity('kings', '2020-01-01'), origin, new Date(opened));
+    rememberPuzzle(seedIdentity('thread', 'night'), origin, new Date(opened));
     expect(lastPuzzleHref('fivefold', origin, new Date(sameDay))).toBe('/games/fivefold/?seed=night&v=1');
     expect(lastPuzzleHref('kings', origin, new Date(sameDay))).toBe('/games/kings/?date=2020-01-01&v=1');
+    expect(lastPuzzleHref('thread', origin, new Date(sameDay))).toBe('/games/ribbon/?seed=night&v=1');
     expect(lastPuzzleHref('fivefold', origin, new Date(nextDay))).toBeNull();
     expect(lastPuzzleHref('kings', origin, new Date(nextDay))).toBeNull();
+    expect(lastPuzzleHref('thread', origin, new Date(nextDay))).toBeNull();
   });
 
   it('does not expire or remove puzzle progress when navigation memory expires', () => {

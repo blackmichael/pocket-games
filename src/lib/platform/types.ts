@@ -11,7 +11,8 @@ export function puzzleKey(identity: PuzzleIdentity): string {
 }
 
 export function puzzleUrl(identity: PuzzleIdentity, origin: string): string {
-  const path = identity.gameId === 'sunmoon' ? '/games/catdog/' : '/games/' + identity.gameId + '/';
+  const path = identity.gameId === 'sunmoon' ? '/games/catdog/' :
+    identity.gameId === 'thread' ? '/games/ribbon/' : '/games/' + identity.gameId + '/';
   const url = new URL(path, origin);
   if (identity.mode === 'daily') url.searchParams.set('date', identity.date!);
   else url.searchParams.set('seed', identity.seed);

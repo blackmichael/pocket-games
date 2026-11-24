@@ -4,7 +4,7 @@ import { puzzleKey, puzzleUrl } from './types';
 
 const origin = 'https://example.com';
 const resolve = (gameId: string, query: string, now?: Date) =>
-  resolvePuzzle(gameId, new URL('/games/' + gameId + '/' + query, origin), now);
+  resolvePuzzle(gameId, new URL('/games/' + (gameId === 'sunmoon' ? 'catdog' : gameId === 'thread' ? 'ribbon' : gameId) + '/' + query, origin), now);
 
 afterEach(() => vi.unstubAllEnvs());
 
@@ -28,7 +28,7 @@ describe('browser-local daily identity', () => {
     vi.stubEnv('TZ', timezone);
     const now = new Date(instant);
     expect(localDate(now)).toBe(date);
-    for (const gameId of ['kings', 'fivefold', 'sunmoon', 'wordladder']) {
+    for (const gameId of ['kings', 'fivefold', 'sunmoon', 'wordladder', 'thread']) {
       expect(resolve(gameId, '', now).identity).toEqual(dailyIdentity(gameId, date));
       expect(resolve(gameId, '?v=1', now).identity).toEqual(dailyIdentity(gameId, date, 1));
       expect(resolve(gameId, '?date=2026-01-01', now).identity).toEqual(dailyIdentity(gameId, '2026-01-01'));
@@ -50,7 +50,7 @@ describe('browser-local daily identity', () => {
   });
 
   it.each(['2020-01-01', '2026-11-08', '2026-11-09', '2027-01-01'])('preserves v1 links for every game on daily %s', (date) => {
-    for (const gameId of ['kings', 'fivefold', 'sunmoon', 'wordladder']) {
+    for (const gameId of ['kings', 'fivefold', 'sunmoon', 'wordladder', 'thread']) {
       const version = 1;
       const identity = dailyIdentity(gameId, date, 1);
       expect(identity).toEqual({
@@ -63,7 +63,7 @@ describe('browser-local daily identity', () => {
 
 
   it('uses the current generator for unversioned arbitrary seeds', () => {
-    for (const gameId of ['kings', 'fivefold', 'sunmoon', 'wordladder']) {
+    for (const gameId of ['kings', 'fivefold', 'sunmoon', 'wordladder', 'thread']) {
       for (const seed of ['', 'random-seed', '2026-01-01']) {
         const identity = seedIdentity(gameId, seed);
         expect(identity).toEqual({ gameId, mode: 'seed', seed, generatorVersion: gameId === 'sunmoon' ? 2 : 1 });
@@ -78,7 +78,7 @@ describe('browser-local daily identity', () => {
   });
 
   it('roundtrips daily and Unicode/empty seed links for every supported version', () => {
-    for (const gameId of ['kings', 'fivefold', 'sunmoon', 'wordladder']) {
+    for (const gameId of ['kings', 'fivefold', 'sunmoon', 'wordladder', 'thread']) {
       const versions: (1 | 2)[] = gameId === 'sunmoon' ? [1, 2] : [1];
       const identities = versions.flatMap((version) => [
         ...['', 'a+b & café 🌱', ' e\u0301 ', '2026-01-01'].map((seed) => seedIdentity(gameId, seed, version)),
@@ -86,7 +86,8 @@ describe('browser-local daily identity', () => {
       ]);
       for (const first of identities) {
         const url = new URL(puzzleUrl(first, origin));
-        expect(url.pathname).toBe(gameId === 'sunmoon' ? '/games/catdog/' : '/games/' + gameId + '/');
+        const path = gameId === 'sunmoon' ? 'catdog' : gameId === 'thread' ? 'ribbon' : gameId;
+        expect(url.pathname).toBe('/games/' + path + '/');
         expect(url.searchParams.get('v')).toBe(String(first.generatorVersion));
         const result = resolvePuzzle(gameId, url);
         expect(result.error).toBeNull();
@@ -103,30 +104,57 @@ describe('browser-local daily identity', () => {
     expect(puzzleKey(daily)).not.toBe(puzzleKey(seedIdentity('kings', daily.seed)));
   });
 
-  it('selects Catdog v2 by default without reusing v1 daily or custom-seed saves', () => {
+  it('preserves Catdog v2 without reusing v1 daily or custom-seed saves', () => {
+    const gameId = 'sunmoon';
     for (const date of ['2020-01-01', '2026-11-12']) {
-      const legacy = dailyIdentity('sunmoon', date, 1);
-      const current = dailyIdentity('sunmoon', date);
+      const legacy = dailyIdentity(gameId, date, 1);
+      const current = dailyIdentity(gameId, date, 2);
       expect(current).toEqual({
-        gameId: 'sunmoon', mode: 'daily', date, generatorVersion: 2,
-        seed: JSON.stringify(['daily', 'sunmoon', date, 'standard', 2])
+        gameId, mode: 'daily', date, generatorVersion: 2,
+        seed: JSON.stringify(['daily', gameId, date, 'standard', 2])
       });
-      expect(resolve('sunmoon', '?date=' + date).identity).toEqual(current);
+      expect(resolve(gameId, '?date=' + date + '&v=2').identity).toEqual(current);
       expect(puzzleKey(current)).not.toBe(puzzleKey(legacy));
     }
-    const legacy = seedIdentity('sunmoon', 'same seed', 1);
-    const current = seedIdentity('sunmoon', 'same seed');
+    const legacy = seedIdentity(gameId, 'same seed', 1);
+    const current = seedIdentity(gameId, 'same seed', 2);
     expect(puzzleKey(current)).not.toBe(puzzleKey(legacy));
-    expect(resolve('sunmoon', '?seed=same+seed&v=1').identity).toEqual(legacy);
-    expect(resolve('sunmoon', '?seed=same+seed&v=2').identity).toEqual(current);
+    expect(resolve(gameId, '?seed=same+seed&v=1').identity).toEqual(legacy);
+    expect(resolve(gameId, '?seed=same+seed&v=2').identity).toEqual(current);
+  });
+
+  it('defaults Ribbon daily identities to v1 with the original thread identity and storage key', () => {
+    const date = '2026-11-12';
+    const current = dailyIdentity('thread', date);
+    expect(current).toEqual({
+      gameId: 'thread', mode: 'daily', date, generatorVersion: 1,
+      seed: JSON.stringify(['daily', 'thread', date, 'standard', 1])
+    });
+    expect(resolve('thread', '?date=' + date).identity).toEqual(current);
+    expect(resolve('thread', '?date=' + date + '&v=1').identity).toEqual(current);
+    expect(puzzleKey(current)).toBe(JSON.stringify(['thread', 'daily', date, current.seed, 1]));
+    expect(puzzleUrl(current, origin)).toBe(origin + '/games/ribbon/?date=' + date + '&v=1');
+  });
+
+  it.each(['', 'a+b & café 🌱', ' e\u0301 ', '2026-01-01'])('keeps exact Ribbon v1 seed %j under the original thread identity', (seed) => {
+    const current = seedIdentity('thread', seed);
+    expect(current).toEqual({ gameId: 'thread', mode: 'seed', seed, generatorVersion: 1 });
+    expect(resolve('thread', '?' + new URLSearchParams({ seed })).identity).toEqual(current);
+    expect(resolve('thread', '?' + new URLSearchParams({ seed, v: '1' })).identity).toEqual(current);
+    expect(puzzleKey(current)).toBe(JSON.stringify(['thread', 'seed', null, seed, 1]));
+    const url = new URL(puzzleUrl(current, origin));
+    expect(url.pathname).toBe('/games/ribbon/');
+    expect(url.searchParams.get('seed')).toBe(seed);
+    expect(url.searchParams.get('v')).toBe('1');
   });
 
   it.each([
     '?date=2026-02-30', '?seed=a&date=2026-01-01', '?seed=a&seed=b', '?seed=&seed=',
     '?date=', '?v=', '?date=2026-01-01&date=2026-01-02', '?v=1&v=1', '?v=2&v=2', '?v=1&v=2',
-    '?v=0', '?v=3', '?v=01', '?v=1.0', '?v=latest', '?v=%202', '?v=2%20'
+    '?v=3&v=3', '?v=2&v=3', '?v=3&v=1',
+    '?v=0', '?v=4', '?v=01', '?v=1.0', '?v=latest', '?v=%202', '?v=2%20', '?v=03', '?v=3.0', '?v=%203', '?v=3%20'
   ])('does not silently replace invalid identity %s', (query) => {
-    for (const gameId of ['fivefold', 'kings', 'sunmoon', 'wordladder']) {
+    for (const gameId of ['fivefold', 'kings', 'sunmoon', 'wordladder', 'thread']) {
       const result = resolve(gameId, query);
       expect(result.identity).toBeNull();
       expect(result.error).not.toBeNull();
@@ -134,7 +162,7 @@ describe('browser-local daily identity', () => {
   });
 
   it.each(['', 'seed=a&', 'date=2026-11-08&', 'date=2027-01-01&'])('rejects unavailable versions in %s', (query) => {
-    for (const gameId of ['fivefold', 'kings', 'sunmoon', 'wordladder']) {
+    for (const gameId of ['fivefold', 'kings', 'sunmoon', 'wordladder', 'thread']) {
       for (const version of gameId === 'sunmoon' ? [3, 4] : [2, 3]) {
         const result = resolve(gameId, '?' + query + 'v=' + version);
         expect(result.identity).toBeNull();

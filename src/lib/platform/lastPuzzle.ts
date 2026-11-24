@@ -19,7 +19,8 @@ export function lastPuzzleHref(gameId: string, origin: string, now = new Date())
     const saved = JSON.parse(raw) as { date?: unknown; url?: unknown } | null;
     if (!saved || saved.date !== localDate(now) || typeof saved.url !== 'string') return null;
     const url = new URL(saved.url, origin);
-    if (url.origin !== origin || url.pathname !== game.href) return null;
+    const legacyRibbonPath = gameId === 'thread' && url.pathname === '/games/thread/';
+    if (url.origin !== origin || (url.pathname !== game.href && !legacyRibbonPath)) return null;
     if (!url.searchParams.has('seed') && !url.searchParams.has('date')) return null;
     const { identity } = resolvePuzzle(gameId, url);
     if (!identity) return null;

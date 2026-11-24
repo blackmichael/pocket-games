@@ -47,5 +47,17 @@ export const games = [
     },
     duration: '3–7 minutes',
     href: '/games/wordladder/'
+  },
+  {
+    id: 'thread',
+    title: 'Ribbon',
+    category: 'Logic',
+    description: 'Connect the numbers, avoid walls, fill every square.',
+    preview: {
+      src: '/previews/ribbon-timed-v1.webp',
+      alt: 'Ribbon board with colorful curved paths, faint matching cell tints, pastel numbered nodes, a plum End node, and dark barriers.'
+    },
+    duration: '3–7 minutes',
+    href: '/games/ribbon/'
   }
 ] as const;
