@@ -13,7 +13,7 @@ export function isCalendarDate(value: string): boolean {
 }
 
 function currentVersion(gameId: string): 1 | 2 {
-  return gameId === 'sunmoon' ? 2 : 1;
+  return gameId === 'sunmoon' || gameId === 'wordladder' ? 2 : 1;
 }
 
 export function dailyIdentity(gameId: string, date: string, generatorVersion: 1 | 2 = currentVersion(gameId)): PuzzleIdentity {
@@ -32,7 +32,7 @@ export function resolvePuzzle(gameId: string, url: URL, now = new Date()): { ide
   if (params.has('date') && params.has('seed'))
     return { identity: null, error: 'Choose either a daily date or a custom seed, not both.' };
   const version = params.get('v') ?? String(currentVersion(gameId));
-  if (version !== '1' && !(gameId === 'sunmoon' && version === '2'))
+  if (version !== '1' && !((gameId === 'sunmoon' || gameId === 'wordladder') && version === '2'))
     return { identity: null, error: 'This generator version is not available for this game.' };
   const generatorVersion = version === '1' ? 1 : 2;
   if (params.has('seed')) return { identity: seedIdentity(gameId, params.get('seed')!, generatorVersion), error: null };

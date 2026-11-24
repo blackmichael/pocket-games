@@ -2591,3 +2591,8 @@ ZONE
 ZOOM
 ZOOS
 `.trim().split('\n'));
+
+// Curated move-only corrections; keep the generator-v1 extract above frozen.
+// Each addition must be a leaf of the playable graph to preserve shortest paths.
+// Provenance: DICTIONARY-LICENSE.txt.
+export const MOVE_ADDITIONS: readonly string[] = Object.freeze(['ORCA']);

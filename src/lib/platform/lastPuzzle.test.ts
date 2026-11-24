@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { localDate, dailyIdentity, resolvePuzzle, seedIdentity } from './daily.js';
 import { lastPuzzleHref, rememberPuzzle } from './lastPuzzle.js';
-import { puzzleKey } from './types.js';
 
 const origin = 'https://example.com';
 let records: Map<string, string>;
@@ -40,6 +39,7 @@ describe('per-game catalog puzzle memory', () => {
 
   it.each([
     ['sunmoon', 'Catdog', 'catdog'],
+    ['wordladder', 'Word Ladder', 'wordladder'],
     ['thread', 'Ribbon', 'ribbon']
   ])('preserves a selected %s (%s) v1 link instead of silently upgrading its board', (gameId, _title, path) => {
     rememberPuzzle(seedIdentity(gameId, 'legacy', 1), origin);
@@ -60,6 +60,45 @@ describe('per-game catalog puzzle memory', () => {
       expect(url.pathname).toBe('/games/ribbon/');
       expect(url.searchParams.get('v')).toBe('1');
       expect(resolvePuzzle('thread', url).identity).toEqual(identity);
+    }
+  });
+
+  it('keeps stored same-day Word Ladder v1 selections pinned to v1', () => {
+    const opened = new Date(2026, 10, 12, 0, 1);
+    const later = new Date(2026, 10, 12, 23, 59);
+    const identities = [
+      dailyIdentity('wordladder', '2020-01-01', 1),
+      ...['', ' a+b & café 🌱 ', 'e\u0301'].map((seed) => seedIdentity('wordladder', seed, 1))
+    ];
+    for (const identity of identities) {
+      const params = identity.mode === 'daily'
+        ? new URLSearchParams({ date: identity.date!, v: '1' })
+        : new URLSearchParams({ seed: identity.seed, v: '1' });
+      const stored = JSON.stringify({ date: localDate(opened), url: origin + '/games/wordladder/?' + params });
+      records.set('puzzle-room:last-puzzle:wordladder', stored);
+      const href = lastPuzzleHref('wordladder', origin, later)!;
+      expect(new URL(href, origin).searchParams.get('v')).toBe('1');
+      expect(resolvePuzzle('wordladder', new URL(href, origin)).identity).toEqual(identity);
+      expect(records.get('puzzle-room:last-puzzle:wordladder')).toBe(stored);
+      expect(lastPuzzleHref('wordladder', origin, new Date(2026, 10, 13))).toBeNull();
+    }
+  });
+
+  it('pins new Word Ladder daily and exact custom-seed selections to v2', () => {
+    const identities = [
+      dailyIdentity('wordladder', '2026-11-12'),
+      ...['', ' a+b & café 🌱 ', 'e\u0301'].map((seed) => seedIdentity('wordladder', seed))
+    ];
+    for (const identity of identities) {
+      expect(identity.generatorVersion).toBe(2);
+      rememberPuzzle(identity, origin);
+      const url = new URL(lastPuzzleHref('wordladder', origin)!, origin);
+      expect(url.pathname).toBe('/games/wordladder/');
+      expect(url.searchParams.get('v')).toBe('2');
+      expect(resolvePuzzle('wordladder', url).identity).toEqual(identity);
+      expect(JSON.parse(records.get('puzzle-room:last-puzzle:wordladder')!)).toEqual({
+        date: localDate(), url: url.href
+      });
     }
   });
 

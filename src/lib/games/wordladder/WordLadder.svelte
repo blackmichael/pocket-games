@@ -9,7 +9,7 @@
   import { generate, moveError, validateSave, isSolved, type Save } from './engine.js';
 
   let { identity }: { identity: PuzzleIdentity } = $props();
-  const puzzle = $derived(generate(identity.seed));
+  const puzzle = $derived(generate(identity.seed, identity.generatorVersion));
   const key = $derived(puzzleKey(identity));
   let ready = $state(false);
   let steps = $state<string[]>([]);
@@ -85,7 +85,7 @@
 
   async function submit() {
     if (!ready || solved) return;
-    const error = moveError(current, draft);
+    const error = moveError(current, draft, puzzle.generatorVersion);
     if (error) { message = error; return; }
     steps = [...steps, draft];
     draft = '';
@@ -128,10 +128,14 @@
     {:else}<span>{steps.length} {steps.length === 1 ? 'step' : 'steps'}</span>{/if}
     <GameHelp game="Word Ladder">
       <p>Connect the starting word to the destination; the two words share no letters. Enter a complete four-letter word using your keyboard or the on-screen keys, changing <strong>exactly one letter</strong> from the current word, then press <strong>Enter</strong>.</p>
-      <p>Each entry must be in our four-letter word list. It uses a spell-checking dictionary with American and British spellings, inflections, and offensive words, excluding proper names and abbreviations.</p>
+      {#if identity.generatorVersion === 1}
+        <p>This pinned v1 puzzle uses the original, smaller dictionary.</p>
+      {:else}
+        <p>Starting and destination words come from a smaller, familiar-word list. Connecting words can use the broader dictionary, including regional spellings and accent-free forms. Proper names and abbreviations are excluded.</p>
+      {/if}
       <p>There is no move limit and no undo. You may revisit a word, but it adds another step. Rejected entries do not count.</p>
       <p>Green letters match the destination in the same position. An underline below a letter box marks the changed letter. Matching letters are not locked; a route may need to change them again.</p>
-      <p>Reach the destination to finish. The shortest possible route length is revealed only at the end. Progress is saved in this browser when storage is available; sharing does not reveal the words.</p>
+      <p>Any valid route to the destination completes the puzzle. The shortest route is shown at the end for reference, not as a target you must match. Progress is saved in this browser when storage is available; sharing does not reveal the words.</p>
     </GameHelp>
   </div>
   {#if warning}<p class="notice" role="status">{warning}</p>{/if}
@@ -174,7 +178,7 @@
       <div class="result-art" aria-hidden="true">{#each puzzle.target as letter, index (index)}<span>{letter}</span>{/each}</div>
       <h2 id="ladder-result-heading">Destination reached!</h2>
       <p class="summary">Your route: <strong>{steps.length} steps</strong><br />Shortest route: <strong>{puzzle.shortest} steps</strong></p>
-      {#if steps.length === puzzle.shortest}<p>You found a shortest route.</p>{/if}
+      <p>Shortest route is for reference. Any valid route completes the puzzle.</p>
       <button class="button" type="button" onclick={handleShare} disabled={sharing}>{nativeSharing ? 'Share' : 'Copy'}</button>
       <p role="status">{shareMessage}</p>
       {#if shareFallback}<label for="ladder-share">Your shareable result</label><textarea id="ladder-share" readonly rows="6" value={shareText} onclick={(event) => event.currentTarget.select()}></textarea>{/if}

@@ -6,9 +6,9 @@ https://wordlist.aspell.net/
 https://downloads.sourceforge.net/wordlist/scowl-2020.12.07.tar.gz
 Archive SHA-256: 5587667caa20c4891390c2d42dbb4d5c4c3f41bee77af1457ece3ba23fb859cc
 
-This modified extract uses the published precompiled SCOWLv1 release rather
-than ESDB v2: the build host has no Python/SQLite extraction toolchain, and
-SCOWLv1 provides explicit word/name/abbreviation category files directly.
+This legacy extract is retained verbatim for published generator-v1 puzzles.
+Generator v2 uses the separately documented, maintained ESDB source below;
+it does not alter this frozen list or the move-only ORCA correction.
 
 Reproduction: from final/, concatenate the 28 files matching
 ^(english|american|british|british_z)-words\.(10|20|35|40|50|55|60)$.
@@ -20,11 +20,12 @@ legal if SCOWL includes it as a lowercase ordinary word (e.g. john).
 Use SCOWL's size-60 spell-checking vocabulary, excluding the broader size-70
 and size-80 word-game tiers (including FOHS, AAHS, AALS, FOID, and INLY).
 American and British spellings, inflections, and offensive words remain
-allowed. The same vocabulary validates endpoints and moves.
+allowed. This extract defines generator v1; moves also accept the curated
+corrections documented below.
 
 2,584 words; newline-terminated uppercase sorted word SHA-256:
 caa32dbb73b5cd7705dd77ce556da17c91be6d3704812a8c6db8a8c5cd1b9467
-Graph: 11,799 undirected single-letter edges, 99 components; largest 2,448.
+Frozen generator graph: 11,799 undirected edges, 99 components; largest 2,448.
 All words are playable; generated endpoints use the largest component.
 
 Frozen generator v1: FNV-1a over each UTF-16 code unit's low byte then high
@@ -37,6 +38,19 @@ first step's state and take unsigned modulo into that pool. A letter may
 not appear anywhere in both endpoints, regardless of position or repeats.
 Shortest means number of moves; it is at least four and is not capped at eight.
 No seed normalization, runtime requests, random/time dependencies, or rerolls.
+
+Curated move-only corrections
+----------------------------
+ORCA: killer whale; a project-curated addition, not part of the SCOWL extract.
+Reference: https://www.merriam-webster.com/dictionary/orca
+
+The playable vocabulary has 2,585 words. ORCA connects only to ORCS, so it
+adds a leaf without shortening any route between existing words. Corrections
+are included in move and save validation, not endpoint selection or generator
+graph construction. Published v1 seeds, endpoints, shortest distances, and
+save-format v1 remain unchanged. Regression tests require each correction to
+be a leaf attached to the frozen vocabulary. Broader changes to generation
+data or shortest routes require a new generator version.
 
 Original release Copyright follows verbatim:
 
@@ -288,3 +302,201 @@ and Australian word list.  It is under the following copyright:
   LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
   OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
   SUCH DAMAGE.
+
+Word Ladder vocabulary and generator v2
+======================================
+
+Source: maintained ESDB / SCOWLv2, rel-2026.02.25
+Repository: https://github.com/en-wl/wordlist
+Pinned commit: 7e99edab8e32f9f9ea2b15f249ca8d4d67237410
+Archive: https://codeload.github.com/en-wl/wordlist/tar.gz/7e99edab8e32f9f9ea2b15f249ca8d4d67237410
+Archive SHA-256: 770dd3e42d20b47bb2dd87d150db4ee5472841a7f062876592f67840f5a0b902
+data/scowl-pre.txt SHA-256: c4f5cfaabce46bc6fe151c2aa29b121425aa045a14166ed6daaffe2cc872f0f3
+combine.py SHA-256: 10609bbb888cbf4ae6c4e07658641c830ff1b9c9a98f9ca51f3057bac18cf07a
+Copyright SHA-256: 090575a131b4260926c7a6b30a90aca0f5db5fbb5c46778e0c5855227bf6ebc3
+
+This is a modified generated word list, not the upstream database. No network
+requests or Python/SQLite dependencies are used by the application or build.
+Only this explicit offline import uses the upstream Python/SQLite tooling.
+The v1 list, move-only ORCA correction, graph, and seed mapping remain frozen.
+
+Reproduction (Python 3.7+ with SQLite 3.33+; Node and tar):
+  curl -fLsS 'https://codeload.github.com/en-wl/wordlist/tar.gz/7e99edab8e32f9f9ea2b15f249ca8d4d67237410' -o /tmp/wordladder-esdb.tar.gz
+  node scripts/import-wordladder-v2.mjs /tmp/wordladder-esdb.tar.gz python3
+The importer verifies the archive hash before extracting it to a temporary
+folder. It executes upstream 'python3 combine.py create-db scowl.db' (the
+Makefile recipe), then calls the supported libscowl.getWords API. It does not
+parse SCOWL text itself or substitute the older SCOWLv1 word lists. The source
+archive hash pins every input, schema, and extraction-tool implementation.
+
+Both pools use the ordinary category only (categories=Include('')). Exclude
+base POS abbr, s, pre, suf, wp, we, x (abbreviations, contractions, affixes,
+compound fragments and nonwords). Exclude POS classes person, surname, place,
+name, name?, upper, upper?, trademark, abbr, abbr?. After the official deaccent
+mapping, require exactly four lowercase ASCII a-z characters BEFORE uppercasing
+and deduplicating. Thus name-only/uppercase entries do not become ordinary
+words; an independently classified lowercase ordinary sense is still accepted.
+Dots and apostrophes are forbidden rather than stripped; the upstream default
+word filter also excludes spaces, hyphens, digits and special symbols. Accents
+are folded only by libscowl.deaccent (e.g. cafe from cafe/café and epee from
+épée); ligatures or punctuation are not silently removed. Offensive/vulgar
+usage notes are not filtered. All arrays are unique and sorted by ASCII.
+
+Moves: size <=80, spellings A/B/Z/C/D (American, British -ise and -ize,
+Canadian, Australian), and ESDB variant_level <=6. The upstream API includes
+unmarked '_' spellings, non-regional entries, the matching US/GB/CA/AU regions,
+and resolves lemma/derived spelling inheritance via the database views.
+ESDB levels: 0 non-variant, 1 include, 2 equal, 3 disagreement, 4 common,
+5 legacy/unspecified variant, 6 acceptable. All of these are accepted; levels
+7 uncommon, 8 archaic and 9 invalid are excluded. These are NOT SCOWLv1's
+legacy_level numbers. Size 80 is upstream's current-valid word-game tier;
+size 85 (including words no longer in modern use) is excluded.
+
+This maintained v2 extract is smaller than a broad SCOWLv1 word-game extract.
+SCOWLv2 reprocesses the sources and corrects derived forms and variants; the
+ordinary-only classification and accepted-variant filters also differ. It is
+not expected to reproduce historical SCOWLv1 size-80 word counts, and no
+legacy vocabulary has been added to force those counts to match.
+
+Endpoints: size <=35, spellings A/B/Z, ESDB variant_level <=1 (the standard
+default spellings, including upstream's specially included coequal forms),
+with the same category/POS/casing/deaccent filters. This is a subset of the
+move pool. ENDPOINT_WORDS is the familiar candidate pool, not a graph: the
+v2 engine further restricts endpoints to the largest connected component of
+the full PLAYABLE_WORDS graph and calculates shortest paths through that full
+move graph. No manual additions or removals occur in either v2 pool.
+ORCA, MISO, CHAI, UDON, ROTI, CAFE and EPEE are present in the imported move pool.
+Their ordinary-noun source entries are unmarked spelling '_' / variant 0:
+orca, miso, chai, udon and roti first appear at size 60; café at size 35;
+épée at size 50. The unaccented 'cafe' entry itself is size 35 / variant 5,
+but CAFE is also an endpoint through the standard variant-0 'café' alias.
+
+PLAYABLE_WORDS: 3988 words.
+Newline-terminated ASCII-sorted uppercase word SHA-256:
+91f1b738b576e9b4e1cdd56d8925443d5278f8b4c712a4262f8d767b897f6502
+ENDPOINT_WORDS: 1869 words before connected-component filtering.
+Newline-terminated ASCII-sorted uppercase word SHA-256:
+aef6ff014fc49af8691018b3c52ed4c69bcf8deb47709016bad5fef5ffbd2689
+Generated words-v2.ts SHA-256:
+391cbc32e5e75aafa2f47b9c3851eae8dcbdc0120e576e4ed9522d47bfa651af
+
+Frozen generator v2: use the same exact-seed UTF-16LE FNV-1a and xorshift32
+operations documented for v1. Build adjacency from PLAYABLE_WORDS, retaining
+all single-position substitutions, and find its largest connected component.
+Visit words in ASCII order; equal-size component ties retain the first.
+Filter ENDPOINT_WORDS to that component in ASCII order. The first xorshift
+draw selects the start modulo the filtered endpoint count. BFS traverses all
+playable neighbors, not just endpoint candidates. Eligible targets are the
+filtered endpoints in ASCII order with distance >=4 and no letters in common
+with the start. The second xorshift draw selects a target modulo that count.
+Return the exact BFS distance as an informational reference. Graph caches do
+not contain RNG state; only the requested version is constructed.
+
+
+All pinned upstream Copyright notices follow verbatim, including Australian,
+UKACD and WordNet notices (retained even when upstream says they may not apply):
+
+Copyright 2000-2026 by Kevin Atkinson
+
+Permission to use, copy, modify, distribute, and sell any part of SCOWLv2, or
+word lists created from it, is hereby granted without fee, provided that the
+above copyright notice appears in all copies and that both the above
+copyright notice and this notice appear in supporting documentation.  Kevin
+Atkinson makes no representations about the suitability of this database for
+any purpose.  It is provided "as is" without express or implied warranty.
+
+SCOWL is derived from many sources, most of which are in the Public Domain.
+Data from the Corpus of Contemporary American English (COCA) was also used.
+
+All data from COCA comes from 3-gram data that is not freely available;
+however, the usage is within the rights given by the NDA that was signed when
+purchasing the data.  More information on COCA is available at
+https://www.english-corpora.org/coca/.
+
+The primary source of words for SCOWL comes from 12dicts and ENABLE2K.  Both
+are in the Public Domain, but Alan Beale <biljir@pobox.com> deserves special
+credit as he is the author of 12dicts and a major contributor to ENABLE2K.  In
+addition, he gave me an incredible amount of feedback and created a number of
+special lists in order to help improve the overall quality of SCOWL.
+
+===
+
+If you are using an official speller dictionary created by SCOWL that is not
+Australian English, then no additional copyright applies and including the
+notice before the === is sufficient.
+
+If you are using the Australian English dictionary or a wordlist that uses the 'D'
+SPELLING code and/or the 'AU' REGION code, the copyright after '=== AU' applies.
+
+If you are using a generated word list larger than 80, the copyright
+after '=== UKACD' applies.
+
+If you are distributing the SCOWLv2 database or results from the SCOWL database
+that is not a speller dictionary or generated word list, then both copyrights
+may apply depending on the parts you use.  In addition, the WordNet copyright
+MIGHT apply as WordNet was one of many sources used for the initial POS
+assignment.
+
+=== AU
+
+The initial information for Australian English comes from Benjamin Titze:
+
+  Copyright 2016 by Benjamin Titze
+
+  Permission to use, copy, modify, distribute and sell this array, the
+  associated software, and its documentation for any purpose is hereby
+  granted without fee, provided that the above copyright notice appears
+  in all copies and that both that copyright notice and this permission
+  notice appear in supporting documentation. Benjamin Titze makes no
+  representations about the suitability of this array for any
+  purpose. It is provided "as is" without express or implied warranty.
+
+=== UKACD
+
+Some words used come from the UK Advanced Cryptics Dictionary:
+
+  Copyright (c) J Ross Beresford 1993-1999. All Rights Reserved.
+
+  The following restriction is placed on the use of this publication:
+  if The UK Advanced Cryptics Dictionary is used in a software package
+  or redistributed in any form, the copyright notice must be
+  prominently displayed and the text of this document must be included
+  verbatim.
+
+  There are no other restrictions: I would like to see the list
+  distributed as widely as possible.
+
+=== WordNet
+
+WordNet was used to help with the initial POS assignment:
+
+  This software and database is being provided to you, the LICENSEE,
+  by Princeton University under the following license.  By obtaining,
+  using and/or copying this software and database, you agree that you
+  have read, understood, and will comply with these terms and
+  conditions.:
+
+  Permission to use, copy, modify and distribute this software and
+  database and its documentation for any purpose and without fee or
+  royalty is hereby granted, provided that you agree to comply with
+  the following copyright notice and statements, including the
+  disclaimer, and that the same appear on ALL copies of the software,
+  database and documentation, including modifications that you make
+  for internal use or for distribution.
+
+  WordNet 1.6 Copyright 1997 by Princeton University.  All rights
+  reserved.
+
+  THIS SOFTWARE AND DATABASE IS PROVIDED "AS IS" AND PRINCETON
+  UNIVERSITY MAKES NO REPRESENTATIONS OR WARRANTIES, EXPRESS OR
+  IMPLIED.  BY WAY OF EXAMPLE, BUT NOT LIMITATION, PRINCETON
+  UNIVERSITY MAKES NO REPRESENTATIONS OR WARRANTIES OF MERCHANT-
+  ABILITY OR FITNESS FOR ANY PARTICULAR PURPOSE OR THAT THE USE OF THE
+  LICENSED SOFTWARE, DATABASE OR DOCUMENTATION WILL NOT INFRINGE ANY
+  THIRD PARTY PATENTS, COPYRIGHTS, TRADEMARKS OR OTHER RIGHTS.
+
+  The name of Princeton University or Princeton may not be used in
+  advertising or publicity pertaining to distribution of the software
+  and/or database.  Title to copyright in this software, database and
+  any associated documentation shall at all times remain with
+  Princeton University and LICENSEE agrees to preserve same.
