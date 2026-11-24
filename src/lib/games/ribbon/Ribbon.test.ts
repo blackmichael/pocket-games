@@ -145,6 +145,43 @@ describe('Ribbon page lifecycle', () => {
   });
 });
 
+describe('Ribbon clearing', () => {
+  it('preserves time through Clear, save/resume, and completion', async () => {
+    await render({ version: 2, path: prefix, elapsedMs: 1234 }); await start();
+    clock = 10000;
+    const clear = target.querySelector<HTMLButtonElement>('.game-control')!;
+    clear.click(); await tick();
+    expect(saved()).toEqual({ version: 2, path: [], elapsedMs: 11234 });
+    expect(target.querySelector('time')!.textContent).toBe('0:11');
+    expect(target.querySelectorAll('.board [aria-pressed="true"]')).toHaveLength(0);
+    expect(clear.disabled).toBe(true);
+    await lifecycle('pagehide', 15000);
+    expect(saved().elapsedMs).toBe(16234);
+    await unmount(component!); component = undefined;
+    clock = 75000;
+    await render(); await start();
+    clock = 80000;
+    for (const cell of puzzle.solution) {
+      target.querySelector<HTMLButtonElement>(`[data-cell="${cell}"]`)!.click();
+      await tick();
+    }
+    expect(saved()).toEqual({ version: 2, path: puzzle.solution, elapsedMs: 21234 });
+    expect(target.querySelector('time')!.textContent).toBe('0:21');
+    expect(target.querySelector<HTMLButtonElement>('.board button')!.disabled).toBe(true);
+  });
+
+  it('clears an untimed historical path without inventing a recorded time', async () => {
+    await render({ version: 2, path: prefix, elapsedMs: null }); await start();
+    clock = 10000;
+    target.querySelector<HTMLButtonElement>('.game-control')!.click(); await tick();
+    expect(saved()).toEqual({ version: 2, path: [], elapsedMs: null });
+    await lifecycle('pagehide', 15000);
+    await lifecycle('pageshow', 75000);
+    await lifecycle('pagehide', 80000);
+    expect(saved()).toEqual({ version: 2, path: [], elapsedMs: null });
+  });
+});
+
 describe('Ribbon tap rewind', () => {
   it.each(['off-board movement', 'off-board release', 'coalesced exit and return'])('preserves the path after %s', async kind => {
     const { board, inside, outside, captured } = await beginRewind();

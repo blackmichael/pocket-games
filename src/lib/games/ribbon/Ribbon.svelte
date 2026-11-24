@@ -244,12 +244,8 @@
   }
 
   function clear() {
-    if (!ready || !started || solved || (!path.length && elapsedMs === 0)) return;
+    if (!ready || !started || solved || !path.length) return;
     releaseDrag();
-    accumulatedMs = 0;
-    startedAt = performance.now();
-    elapsedMs = 0;
-    if (timerHandle === undefined) timerHandle = window.setInterval(updateElapsed, 250);
     changed([]);
     flushSave();
   }
@@ -451,7 +447,7 @@
           <figcaption>Go around walls.</figcaption>
         </figure>
       </div>
-      <p>Drag or tap a neighbor to draw. Drag back or tap your path to rewind. <strong>Clear</strong> erases the path and restarts the timer.</p>
+      <p>Drag or tap a neighbor to draw. Drag back or tap your path to rewind. <strong>Clear</strong> erases the path without resetting the timer.</p>
       <details class="help-details">
         <summary>Keyboard controls</summary>
         <p>Tab to the board. Arrow keys draw from the endpoint, or start at 1 on an empty board. Enter or Space selects the focused square. Backspace removes a step.</p>
@@ -465,7 +461,7 @@
     <span class="timer">Time {#if elapsedMs === null}<span aria-label="Not recorded">—</span>{:else}<time datetime="PT{Math.floor(elapsedMs / 1000)}S">{elapsedText}</time>{/if}</span>
   </div>
   {#if warning}<p class="notice" role="status">{warning}</p>{/if}
-  {#if ready && elapsedMs === null && !solved}<p class="notice">This saved path predates timing. Resume it without a recorded time, or use Clear after resuming to begin a timed attempt.</p>{/if}
+  {#if ready && elapsedMs === null && !solved}<p class="notice">This saved puzzle predates timing. You can play, but its completion time will remain unrecorded.</p>{/if}
   {#if ready && started}
     <div class="board" class:complete={solved} class:keyboard-focus={keyboardFocus} role="group" aria-label="Ribbon board" aria-describedby="ribbon-status" bind:this={board} onpointerdown={pointerDown} onpointermove={pointerMove} onpointerup={pointerEnd} onpointercancel={pointerEnd} onlostpointercapture={pointerEnd}>
       {#each puzzle.checkpoints as checkpoint, cell (cell)}
@@ -487,7 +483,7 @@
     <p id="ribbon-status" class="status" class:sr-only={solved} role="status" aria-live="polite" aria-atomic="true">{solved ? `Ribbon complete${elapsedMs === null ? '' : ` in ${elapsedText}`}. Every cell is connected.` : message || (path.length ? `Connect to ${nextCheckpoint}${nextCheckpoint === checkpointCount ? ' — fill every square first.' : '.'}` : 'Start at 1.')}</p>
     {#if !solved}
       <div class="controls">
-        <button class="game-control" type="button" onclick={clear} disabled={!path.length && elapsedMs === 0} aria-label="Clear path and restart timer">Clear</button>
+        <button class="game-control" type="button" onclick={clear} disabled={!path.length} aria-label="Clear path">Clear</button>
       </div>
     {/if}
   {:else}
