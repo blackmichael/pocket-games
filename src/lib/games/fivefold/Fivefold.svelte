@@ -32,6 +32,13 @@
   let draft = $state('');
   let message = $state('');
   let inputError = $state(false);
+  let rejectedEntry = $state(0);
+
+  $effect(() => {
+    if (!rejectedEntry) return;
+    const timeout = window.setTimeout(() => { rejectedEntry = 0; }, 500);
+    return () => window.clearTimeout(timeout);
+  });
   let storageWarning = $state<string | null>(null);
   let shareText = $state('');
   let shareMessage = $state('');
@@ -101,11 +108,13 @@
       if (draft.length !== WORD_LENGTH) {
         message = `Add ${WORD_LENGTH - draft.length} more ${WORD_LENGTH - draft.length === 1 ? 'letter' : 'letters'}.`;
         inputError = true;
+        rejectedEntry += 1;
         return;
       }
       if (!isAllowedGuess(draft)) {
         message = 'Not in our word list.';
         inputError = true;
+        rejectedEntry += 1;
         return;
       }
       guesses = [...guesses, draft];
@@ -113,6 +122,7 @@
       draft = '';
       message = 'Guess recorded. Try another word.';
       inputError = false;
+      rejectedEntry = 0;
       persist();
       return;
     }
@@ -127,6 +137,7 @@
     }
     message = '';
     inputError = false;
+    rejectedEntry = 0;
     persist();
   }
 
@@ -216,7 +227,7 @@
 
   <div class="board" role="group" aria-label="Guess board: six guesses, five letters each" aria-busy={!ready}>
     {#each boardRows as row (row.index)}
-      <div class="board-row" class:current={row.active && ready} role="group" aria-label={row.description}>
+      <div class="board-row" class:current={row.active && ready} class:word-rejected={row.active && !!rejectedEntry} role="group" aria-label={row.description}>
         {#each Array.from({ length: WORD_LENGTH }) as _, column (column)}
           {@const state = row.states?.[column]}
           <div
@@ -322,6 +333,7 @@
   .tile-letter { font-size: clamp(1.45rem, 7vw, 1.95rem); font-weight: 800; }
   .current .tile { border-color: var(--accent-line); }
   .current .tile.filled { border-color: var(--accent); background: var(--page); }
+  .current.word-rejected .tile { color: #a42c35; border-color: #a42c35; }
   .tile.correct { background: #22724f; border-color: #22724f; color: #fff; }
   .tile.present { background: #f5cd47; border-color: #d6ad26; color: #49380e; }
   .tile.absent { background: #6b778a; border-color: #6b778a; color: #fff; }

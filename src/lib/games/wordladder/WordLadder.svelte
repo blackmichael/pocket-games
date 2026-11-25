@@ -15,6 +15,13 @@
   let steps = $state<string[]>([]);
   let draft = $state('');
   let message = $state('');
+  let rejectedEntry = $state(0);
+
+  $effect(() => {
+    if (!rejectedEntry) return;
+    const timeout = window.setTimeout(() => { rejectedEntry = 0; }, 500);
+    return () => window.clearTimeout(timeout);
+  });
   let warning = $state<string | null>(null);
   let resultOpen = $state(false);
   let history = $state<HTMLDivElement | null>(null);
@@ -66,6 +73,7 @@
     } else if (/^[a-zA-Z]$/.test(key) && draft.length < 4) draft += key.toUpperCase();
     else return;
     message = '';
+    rejectedEntry = 0;
     persist();
   }
 
@@ -86,7 +94,8 @@
   async function submit() {
     if (!ready || solved) return;
     const error = moveError(current, draft, puzzle.generatorVersion);
-    if (error) { message = error; return; }
+    if (error) { message = error; rejectedEntry += 1; return; }
+    rejectedEntry = 0;
     steps = [...steps, draft];
     draft = '';
     message = '';
@@ -161,7 +170,7 @@
     </div>
     {#if !solved}
       <p id="ladder-instruction" class="entry-instruction">Change one letter in <strong>{current}</strong>.</p>
-      <div class="word draft" role="group" aria-describedby="ladder-instruction ladder-status" aria-label={`Next word: ${draft || 'empty'}`}>
+      <div class="word draft" class:word-rejected={!!rejectedEntry} role="group" aria-describedby="ladder-instruction ladder-status" aria-label={`Next word: ${draft || 'empty'}`}>
         {#each Array.from({ length: 4 }, (_, index) => index) as position (position)}
           <span>{draft[position] ?? ''}</span>
         {/each}
@@ -207,6 +216,7 @@
   .entry-instruction strong { color: var(--ink); }
   .draft { justify-content: center; }
   .draft > span { width: 44px; height: 48px; border: 2px solid var(--accent-line); font-size: 1.4rem; }
+  .draft.word-rejected > span { color: #a42c35; border-color: #a42c35; }
   .status { min-height: 20px; margin: 6px 0 8px; color: var(--muted); text-align: center; font-size: .85rem; line-height: 20px; }
   h2 { margin: 10px 0; font-size: 1.5rem; }
   .summary { line-height: 1.8; }
