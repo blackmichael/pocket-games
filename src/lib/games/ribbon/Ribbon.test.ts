@@ -210,3 +210,53 @@ describe('Ribbon tap rewind', () => {
     expect(saved().path).toEqual(prefix);
   });
 });
+
+describe('Ribbon touch containment', () => {
+  function touchMove(element: Element, touches = 1, cancelable = true) {
+    const event = new Event('touchmove', { bubbles: true, cancelable });
+    const points = Array.from({ length: touches }, (_, identifier) => ({ identifier, target: element }));
+    Object.defineProperties(event, {
+      touches: { value: points },
+      targetTouches: { value: points },
+    });
+    element.dispatchEvent(event);
+    return event;
+  }
+
+  it('cancels single-finger board moves without changing progress or blocking taps', async () => {
+    await render(); await start();
+    const cell = target.querySelector<HTMLButtonElement>(`[data-cell="${puzzle.solution[0]}"]`)!;
+    expect(touchMove(cell).defaultPrevented).toBe(true);
+    expect(target.querySelectorAll('.board [aria-pressed="true"]')).toHaveLength(0);
+    cell.click(); await tick();
+    expect(cell.getAttribute('aria-pressed')).toBe('true');
+    expect(touchMove(cell).defaultPrevented).toBe(true);
+  });
+
+  it('leaves the start gate, controls, multi-touch, and noncancelable moves alone', async () => {
+    await render();
+    expect(touchMove(target.querySelector('.start-cover')!).defaultPrevented).toBe(false);
+    await start();
+    const cell = target.querySelector('.board button')!;
+    expect(touchMove(target.querySelector('.game-control')!).defaultPrevented).toBe(false);
+    expect(touchMove(cell, 2).defaultPrevented).toBe(false);
+    expect(touchMove(cell, 1, false).defaultPrevented).toBe(false);
+    await lifecycle('pagehide', 1000);
+    expect(touchMove(cell).defaultPrevented).toBe(false);
+    await lifecycle('pageshow', 2000);
+    expect(touchMove(cell).defaultPrevented).toBe(true);
+    await unmount(component!); component = undefined;
+    expect(touchMove(cell).defaultPrevented).toBe(false);
+  });
+
+  it('allows normal gestures after completion', async () => {
+    await render(); await start();
+    const board = target.querySelector('.board')!;
+    for (const cell of puzzle.solution) {
+      board.querySelector<HTMLButtonElement>(`[data-cell="${cell}"]`)!.click();
+      await tick();
+    }
+    expect(board.classList.contains('complete')).toBe(true);
+    expect(touchMove(board).defaultPrevented).toBe(false);
+  });
+});

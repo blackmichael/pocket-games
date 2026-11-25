@@ -229,6 +229,21 @@
     };
   });
 
+  $effect(() => {
+    const element = board;
+    if (!element) return;
+    function containTouchMove(event: TouchEvent) {
+      if (ready && started && !solved && !pageSuspended && event.cancelable &&
+          event.touches.length === 1 && event.targetTouches.length === 1) {
+        event.preventDefault();
+      }
+    }
+    // Explicitly non-passive: supplement touch-action for iOS browser gestures.
+    // Touch moves retain their original target even when the finger leaves the board.
+    element.addEventListener('touchmove', containTouchMove, { passive: false });
+    return () => element.removeEventListener('touchmove', containTouchMove);
+  });
+
   function select(cell: number): boolean {
     if (!ready || !started || solved) return false;
     const result = move(puzzle, path, cell);
