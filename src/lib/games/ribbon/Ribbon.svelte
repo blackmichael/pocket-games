@@ -511,8 +511,7 @@
         <svg viewBox="0 0 120 76" width="120" height="76" fill="none"><path d="M16 18H58V58H102V18H82" /><circle cx="16" cy="18" r="7" /><circle cx="102" cy="58" r="7" /><circle cx="82" cy="18" r="7" /></svg>
       </div>
       <h2 id="ribbon-result-heading">All connected!</h2>
-      <p class="summary">{CELL_COUNT} cells, {checkpointCount} checkpoints.<br />One unbroken path.</p>
-      <p class="result-time">{#if elapsedMs === null}Time not recorded.{:else}Solved in <strong>{elapsedText}</strong>{/if}</p>
+      <p class="result-time">{#if elapsedMs === null}You filled the board. Time not recorded.{:else}You filled the board in <strong>{elapsedText}</strong>.{/if}</p>
       <button class="button" type="button" onclick={handleShare} disabled={sharing}>{nativeSharing ? 'Share' : 'Copy'}</button>
       <p class="share-status" role="status">{shareMessage}</p>
       {#if shareFallback}<label for="ribbon-share">Your shareable result</label><textarea id="ribbon-share" readonly rows="6" value={shareText} onclick={(event) => event.currentTarget.select()}></textarea>{/if}
@@ -579,7 +578,6 @@
   .controls { display: flex; justify-content: center; align-items: center; gap: 12px; font-size: .85rem; }
   .result-trigger { justify-self: start; padding: 0; text-align: left; }
   h2 { margin: 8px 0; font-size: 1.5rem; }
-  .summary { margin: 8px 0 18px; line-height: 1.7; }
   .result-time { color: var(--muted); font-size: .9rem; }
   .result-time strong { color: var(--ink); font-size: 1.15rem; font-variant-numeric: tabular-nums; }
   .result-art { margin: 0 auto 12px; color: var(--accent); }

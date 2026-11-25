@@ -186,8 +186,7 @@
     <ResultDialog id="ladder-result" headingId="ladder-result-heading" bind:open={resultOpen}>
       <div class="result-art" aria-hidden="true">{#each puzzle.target as letter, index (index)}<span>{letter}</span>{/each}</div>
       <h2 id="ladder-result-heading">Destination reached!</h2>
-      <p class="summary">Your route: <strong>{steps.length} steps</strong><br />Shortest route: <strong>{puzzle.shortest} steps</strong></p>
-      <p>Shortest route is for reference. Any valid route completes the puzzle.</p>
+      <p class="summary">You connected {puzzle.start} to {puzzle.target} in <strong>{steps.length} steps</strong>.<br />Shortest route: {puzzle.shortest} steps.</p>
       <button class="button" type="button" onclick={handleShare} disabled={sharing}>{nativeSharing ? 'Share' : 'Copy'}</button>
       <p role="status">{shareMessage}</p>
       {#if shareFallback}<label for="ladder-share">Your shareable result</label><textarea id="ladder-share" readonly rows="6" value={shareText} onclick={(event) => event.currentTarget.select()}></textarea>{/if}
